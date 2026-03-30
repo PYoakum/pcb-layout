@@ -1,6 +1,10 @@
+import { useRef } from 'react';
 import { useStore } from '../../store';
 import type { EditorTool } from '../../store/editor-slice';
 import { exportProject } from '../../api/client';
+import { deserializeProject, validateProjectFile } from '@pcb/project-serialization';
+import type { ProjectFile } from '@pcb/project-serialization';
+import { LayerType } from '@pcb/domain';
 
 const tools: { id: EditorTool; label: string }[] = [
   { id: 'select', label: 'Select' },
@@ -24,6 +28,55 @@ export function Toolbar() {
   const openNewProjectDialog = useStore((s) => s.openNewProjectDialog);
   const openWorkspaceSettings = useStore((s) => s.openWorkspaceSettings);
   const currentProjectId = useStore((s) => s.currentProject?.id);
+  const setCurrentProject = useStore((s) => s.setCurrentProject);
+  const setCurrentBoard = useStore((s) => s.setCurrentBoard);
+  const setComponents = useStore((s) => s.setComponents);
+  const setTraces = useStore((s) => s.setTraces);
+  const setActiveLayerId = useStore((s) => s.setActiveLayerId);
+  const addNotification = useStore((s) => s.addNotification);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpen = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const json: ProjectFile = JSON.parse(text);
+
+      const validation = validateProjectFile(json);
+      if (validation.errors.length > 0) {
+        addNotification({ type: 'error', message: `Invalid file: ${validation.errors[0].message}` });
+        return;
+      }
+
+      const result = deserializeProject(json);
+
+      setCurrentProject(result.project);
+
+      if (result.boards.length > 0) {
+        const board = result.boards[0];
+        setCurrentBoard(board);
+        setComponents(result.components);
+        setTraces(result.paths);
+
+        const topCopper = board.layers.find((l) => l.type === LayerType.Signal);
+        setActiveLayerId(topCopper?.id ?? board.layers[0]?.id ?? null);
+      }
+
+      addNotification({ type: 'success', message: `Opened ${result.project.name}` });
+    } catch (err) {
+      addNotification({ type: 'error', message: `Failed to open file: ${err instanceof Error ? err.message : 'Unknown error'}` });
+    }
+
+    // Reset so the same file can be re-selected
+    e.target.value = '';
+  };
 
   const handleExport = async () => {
     if (!currentProjectId) return;
@@ -43,7 +96,14 @@ export function Toolbar() {
       {/* File menu */}
       <div className="toolbar__group">
         <button className="toolbar__btn" onClick={openNewProjectDialog}>New</button>
-        <button className="toolbar__btn">Open</button>
+        <button className="toolbar__btn" onClick={handleOpen}>Open</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pcb,.json"
+          style={{ display: 'none' }}
+          onChange={handleFileSelected}
+        />
         <button className="toolbar__btn">Save</button>
         <button className="toolbar__btn" onClick={handleExport}>Export .pcb</button>
       </div>

@@ -13,6 +13,7 @@
     "@pcb/render-pixi": "*",
     "@pcb/render-three": "*",
     "@pcb/ui-components": "*",
+    "@pcb/project-serialization": "*",
     "pixi.js": "^8.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
