@@ -1,5 +1,6 @@
 import { useStore } from '../../store';
 import type { EditorTool } from '../../store/editor-slice';
+import { exportProject } from '../../api/client';
 
 const tools: { id: EditorTool; label: string }[] = [
   { id: 'select', label: 'Select' },
@@ -22,6 +23,16 @@ export function Toolbar() {
   const projectName = useStore((s) => s.currentProject?.name ?? 'Untitled Project');
   const openNewProjectDialog = useStore((s) => s.openNewProjectDialog);
   const openWorkspaceSettings = useStore((s) => s.openWorkspaceSettings);
+  const currentProjectId = useStore((s) => s.currentProject?.id);
+
+  const handleExport = async () => {
+    if (!currentProjectId) return;
+    try {
+      await exportProject(currentProjectId);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
 
   return (
     <div className="toolbar">
@@ -34,6 +45,7 @@ export function Toolbar() {
         <button className="toolbar__btn" onClick={openNewProjectDialog}>New</button>
         <button className="toolbar__btn">Open</button>
         <button className="toolbar__btn">Save</button>
+        <button className="toolbar__btn" onClick={handleExport}>Export .pcb</button>
       </div>
 
       <div className="toolbar__separator" />

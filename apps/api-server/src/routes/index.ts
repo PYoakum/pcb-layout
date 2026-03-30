@@ -7,6 +7,7 @@ import { componentRoutes } from './components';
 import { pathRoutes } from './paths';
 import { netRoutes } from './nets';
 import { validationRoutes } from './validation';
+import { exportRoutes } from './export';
 
 export async function registerRoutes(app: FastifyInstance, store: Store) {
   await projectRoutes(app, store);
@@ -16,4 +17,5 @@ export async function registerRoutes(app: FastifyInstance, store: Store) {
   await pathRoutes(app, store);
   await netRoutes(app, store);
   await validationRoutes(app, store);
+  await exportRoutes(app, store);
 }

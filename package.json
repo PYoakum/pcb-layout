@@ -1,6 +1,6 @@
 {
   "name": "pcb-layout",
-  "private": true,
+  "license": "MIT",
   "workspaces": [
     "apps/*",
     "packages/*"

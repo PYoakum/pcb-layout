@@ -259,6 +259,36 @@ export async function getPathDebug(
   );
 }
 
+// ── Export ──
+
+export async function exportProject(projectId: string): Promise<void> {
+  const url = `${BASE_URL}/api/projects/${projectId}/export`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    let errorBody: ErrorResponse;
+    try {
+      errorBody = await res.json();
+    } catch {
+      throw new ApiError(res.status, 'unknown', res.statusText);
+    }
+    throw new ApiError(errorBody.statusCode, errorBody.error, errorBody.message);
+  }
+
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const filenameMatch = disposition.match(/filename="(.+?)"/);
+  const filename = filenameMatch?.[1] ?? 'project.pcb';
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
 // ── Validation ──
 
 export async function validateBoard(
