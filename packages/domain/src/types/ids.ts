@@ -17,6 +17,7 @@ export type PlacementId = Brand<string, 'PlacementId'>;
 export type DebugLinkId = Brand<string, 'DebugLinkId'>;
 export type DesignRuleId = Brand<string, 'DesignRuleId'>;
 export type LibraryAssetId = Brand<string, 'LibraryAssetId'>;
+export type MountingHoleId = Brand<string, 'MountingHoleId'>;
 
 // ID factory functions
 export function createId<T extends string>(prefix: string): T {

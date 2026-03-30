@@ -50,3 +50,7 @@ export { validateProjectFile } from './validator';
 // Migration
 export type { MigrationStep, MigrationResult } from './migration';
 export { migrateProjectFile, canMigrate, registerMigration } from './migration';
+
+// Format Exporters
+export type { ExportFormat } from './exporters';
+export { exportKiCad, exportEagle, exportAltium, EXPORT_FORMATS } from './exporters';

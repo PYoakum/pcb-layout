@@ -1,5 +1,5 @@
 import { Application, Container, Graphics } from 'pixi.js';
-import type { Board, Component, TracePath, Point2D } from '@pcb/domain';
+import type { Board, Component, TracePath, Point2D, MountingHole } from '@pcb/domain';
 import {
   type ViewportState,
   type SelectionState,
@@ -54,6 +54,7 @@ export class PCBCanvas {
   private board: Board | null = null;
   private components: Component[] = [];
   private traces: TracePath[] = [];
+  private mountingHoles: MountingHole[] = [];
   private ghostComponent: Component | null = null;
   private activeTracePoints: Point2D[] | null = null;
   private screenWidth: number;
@@ -199,6 +200,12 @@ export class PCBCanvas {
     this.render();
   }
 
+  /** Set mounting holes to render */
+  setMountingHoles(holes: MountingHole[]): void {
+    this.mountingHoles = holes;
+    this.render();
+  }
+
   /** Set ghost component for placement preview */
   setGhostComponent(comp: Component | null): void {
     this.ghostComponent = comp;
@@ -268,6 +275,51 @@ export class PCBCanvas {
 
       const graphic = this.componentRenderer.createComponentGraphic(comp, this.viewport, opts);
       layerContainer.addChild(graphic);
+
+      // Silkscreen designator -- render on the matching silkscreen layer
+      if (this.board) {
+        const isTopLayer = layerDef && layerDef.order <= 2;
+        const silkType = isTopLayer ? 'silkscreen_top' : 'silkscreen_bottom';
+        const silkLayer = this.board.layers.find((l) => l.type === silkType);
+        if (silkLayer) {
+          const silkContainer = this.layerRenderer.getContainer(silkLayer.id);
+          if (silkContainer) {
+            const silkGraphic = this.componentRenderer.createSilkscreenDesignator(comp, this.viewport);
+            if (silkGraphic) {
+              silkContainer.addChild(silkGraphic);
+            }
+          }
+        }
+      }
+    }
+
+    // Mounting holes
+    for (const hole of this.mountingHoles) {
+      const layerContainer = this.layerRenderer.getContainer(hole.layerId);
+      if (!layerContainer) continue;
+
+      const gfx = new Graphics();
+      const { zoom, x: vx, y: vy } = this.viewport;
+      const cx = hole.position.x * zoom + vx;
+      const cy = hole.position.y * zoom + vy;
+      const outerR = (hole.diameter / 2) * zoom;
+      const innerR = outerR * 0.6;
+
+      // Outer ring
+      if (hole.plated) {
+        gfx.circle(cx, cy, Math.max(2, outerR)).fill({ color: 0xc0c0c0, alpha: 0.8 });
+      } else {
+        gfx.circle(cx, cy, Math.max(2, outerR)).stroke({ color: 0x808080, width: 2, alpha: 0.8 });
+      }
+      // Drill hole
+      gfx.circle(cx, cy, Math.max(1, innerR)).fill({ color: 0x111111, alpha: 1 });
+
+      // Crosshair
+      const ch = outerR * 1.3;
+      gfx.moveTo(cx - ch, cy).lineTo(cx + ch, cy).stroke({ color: 0x808080, width: 1, alpha: 0.5 });
+      gfx.moveTo(cx, cy - ch).lineTo(cx, cy + ch).stroke({ color: 0x808080, width: 1, alpha: 0.5 });
+
+      layerContainer.addChild(gfx);
     }
 
     // Traces

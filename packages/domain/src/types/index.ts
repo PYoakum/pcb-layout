@@ -7,4 +7,5 @@ export * from './trace';
 export * from './module';
 export * from './project';
 export * from './design-rules';
+export * from './hole';
 export * from './render';

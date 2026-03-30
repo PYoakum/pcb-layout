@@ -8,6 +8,7 @@ const GHOST_ALPHA = 0.4;
 const BODY_ALPHA = 0.6;
 const PAD_ALPHA = 0.9;
 const TEXT_STYLE = { fontFamily: 'monospace', fontSize: 10, fill: 0xffffff };
+const SILK_TEXT_STYLE = { fontFamily: 'monospace', fontSize: 10, fill: 0xffff00 };
 
 export interface ComponentRenderOptions {
   selected: boolean;
@@ -118,6 +119,53 @@ export class ComponentRenderer {
     }
 
     return gfx;
+  }
+
+  /**
+   * Create a silkscreen designator graphic for a component.
+   * Rendered as yellow text positioned at the component's center.
+   */
+  createSilkscreenDesignator(
+    component: Component,
+    viewport: ViewportState,
+  ): Container | null {
+    const { zoom, x: vx, y: vy } = viewport;
+    if (zoom <= 0.3) return null;
+
+    const container = new Container();
+    container.label = `silk-${component.id}`;
+
+    const { position, rotation } = component.transform;
+    const sx = position.x * zoom + vx;
+    const sy = position.y * zoom + vy;
+    container.position.set(sx, sy);
+    container.angle = rotation;
+
+    const bb = component.footprint.boundingBox;
+    const cx = (bb.min.x + (bb.max.x - bb.min.x) / 2) * zoom;
+    const cy = (bb.min.y + (bb.max.y - bb.min.y) / 2) * zoom;
+
+    const text = new Text({
+      text: component.designator,
+      style: {
+        ...SILK_TEXT_STYLE,
+        fontSize: Math.max(8, Math.min(14, 10 * zoom)),
+      },
+    });
+    text.anchor.set(0.5, 0.5);
+    text.position.set(cx, cy);
+    container.addChild(text);
+
+    // Component outline for silkscreen (thin line)
+    const gfx = new Graphics();
+    const bw = (bb.max.x - bb.min.x) * zoom;
+    const bh = (bb.max.y - bb.min.y) * zoom;
+    const bx = bb.min.x * zoom;
+    const by = bb.min.y * zoom;
+    gfx.rect(bx, by, bw, bh).stroke({ color: 0xffff00, width: 1, alpha: 0.5 });
+    container.addChild(gfx);
+
+    return container;
   }
 
   destroy(): void {

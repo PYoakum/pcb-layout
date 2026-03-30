@@ -1,4 +1,4 @@
-import type { Point2D, Component, TracePath, Rotation, GridConfig, LayerId } from '@pcb/domain';
+import type { Point2D, Component, TracePath, MountingHole, Rotation, GridConfig, LayerId, BoardLayer } from '@pcb/domain';
 import { normalizeRotation, createId } from '@pcb/domain';
 import { EditorTool } from './tools';
 import type { PointerEvent2D, KeyEvent, ToolContext, ToolResult } from './tools';
@@ -51,12 +51,14 @@ export class EditorController {
   // Board data (mutable references -- owned externally, mutated by commands)
   private components: Component[] = [];
   private traces: TracePath[] = [];
+  private mountingHoles: MountingHole[] = [];
 
   // Editor state
   private selection: SelectionState = createSelectionState();
   private viewport: ViewportState = createViewport();
   private gridConfig: GridConfig = { spacingX: 5, spacingY: 5, subdivisions: 2, visible: true, snapEnabled: true };
   private activeLayerId: LayerId = '' as LayerId;
+  private layers: BoardLayer[] = [];
   private traceWidth = 10;
 
   // Overlay state
@@ -268,6 +270,26 @@ export class EditorController {
     this.traces = this.traces.filter((t) => t.id !== id);
   }
 
+  // ------- Mounting hole operations -------
+
+  setMountingHoles(holes: MountingHole[]): void {
+    this.mountingHoles = holes;
+  }
+
+  getMountingHoles(): MountingHole[] {
+    return this.mountingHoles;
+  }
+
+  addMountingHole(hole: MountingHole): void {
+    this.mountingHoles.push(hole);
+    this.emitState();
+  }
+
+  removeMountingHole(id: string): void {
+    this.mountingHoles = this.mountingHoles.filter((h) => h.id !== id);
+    this.emitState();
+  }
+
   // ------- State access -------
 
   getSelection(): SelectionState {
@@ -293,6 +315,10 @@ export class EditorController {
 
   setActiveLayerId(id: LayerId): void {
     this.activeLayerId = id;
+  }
+
+  setLayers(layers: BoardLayer[]): void {
+    this.layers = layers;
   }
 
   setTraceWidth(width: number): void {
@@ -356,6 +382,7 @@ export class EditorController {
       gridConfig: this.gridConfig,
       activeLayerId: this.activeLayerId,
       traceWidth: this.traceWidth,
+      layers: this.layers,
     };
   }
 

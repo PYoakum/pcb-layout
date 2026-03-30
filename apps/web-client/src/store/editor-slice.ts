@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { LayerId, Component, TracePath, Point2D } from '@pcb/domain';
+import type { LayerId, Component, TracePath, MountingHole, Point2D } from '@pcb/domain';
 import type { LibraryComponent } from '../data/default-components';
 
 export type EditorTool = 'select' | 'place' | 'trace' | 'pan' | 'measure';
@@ -29,6 +29,7 @@ export interface EditorSlice {
   // Board data managed by the editor
   components: Component[];
   traces: TracePath[];
+  mountingHoles: MountingHole[];
 
   // Undo/redo availability (mirrors controller state for UI)
   canUndo: boolean;
@@ -80,6 +81,11 @@ export interface EditorSlice {
   addTrace: (trace: TracePath) => void;
   removeTrace: (id: string) => void;
 
+  // Mounting hole mutations
+  setMountingHoles: (holes: MountingHole[]) => void;
+  addMountingHole: (hole: MountingHole) => void;
+  removeMountingHole: (id: string) => void;
+
   // Undo/redo state
   setCanUndo: (value: boolean) => void;
   setCanRedo: (value: boolean) => void;
@@ -103,6 +109,7 @@ export const createEditorSlice: StateCreator<EditorSlice> = (set) => ({
 
   components: [],
   traces: [],
+  mountingHoles: [],
 
   canUndo: false,
   canRedo: false,
@@ -216,6 +223,15 @@ export const createEditorSlice: StateCreator<EditorSlice> = (set) => ({
 
   removeTrace: (id) =>
     set((state) => ({ traces: state.traces.filter((t) => t.id !== id) })),
+
+  // Mounting holes
+  setMountingHoles: (holes) => set({ mountingHoles: holes }),
+
+  addMountingHole: (hole) =>
+    set((state) => ({ mountingHoles: [...state.mountingHoles, hole] })),
+
+  removeMountingHole: (id) =>
+    set((state) => ({ mountingHoles: state.mountingHoles.filter((h) => h.id !== id) })),
 
   // Undo/redo
   setCanUndo: (value) => set({ canUndo: value }),

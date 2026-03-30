@@ -1,4 +1,4 @@
-import type { Point2D, TracePath, TraceSegment, Pad, Component } from '@pcb/domain';
+import type { Point2D, TracePath, TraceSegment, Via, Pad, Component, LayerId } from '@pcb/domain';
 import { createId } from '@pcb/domain';
 import type { PointerEvent2D, KeyEvent, ToolContext, ToolResult } from '../tools';
 import type { ToolHandler, ToolOperations } from './tool-handler';
@@ -6,15 +6,20 @@ import { NOOP_RESULT, dirtyResult } from './tool-handler';
 import { snapToGrid } from '../snap';
 
 const PAD_SNAP_THRESHOLD = 10; // mils — must click very close to pad center to snap
+const DEFAULT_VIA_OUTER = 30;  // mils
+const DEFAULT_VIA_DRILL = 15;  // mils
 
 export class TraceTool implements ToolHandler {
   readonly name = 'trace';
 
   private waypoints: Point2D[] = [];
+  private waypointLayers: LayerId[] = [];
+  private vias: Via[] = [];
   private cursorPoint: Point2D = { x: 0, y: 0 };
   private startPadId: string | null = null;
   private netId: string | null = null;
   private active = false;
+  private currentLayerId: LayerId | null = null;
 
   activate(_ctx: ToolContext, ops: ToolOperations): void {
     ops.setCursor('crosshair');
@@ -44,6 +49,9 @@ export class TraceTool implements ToolHandler {
         ? this.padWorldPos(padHit.component, padHit.pad)
         : gridPoint;
       this.waypoints = [startPoint];
+      this.currentLayerId = ctx.activeLayerId;
+      this.waypointLayers = [this.currentLayerId];
+      this.vias = [];
       this.active = true;
       this.startPadId = padHit?.pad.id ?? null;
       this.netId = padHit ? this.findNetForPad(padHit.pad.id) : null;
@@ -55,12 +63,14 @@ export class TraceTool implements ToolHandler {
     if (padHit) {
       const endPoint = this.padWorldPos(padHit.component, padHit.pad);
       this.waypoints.push(endPoint);
+      this.waypointLayers.push(this.currentLayerId!);
       this.commitTrace(ctx, ops);
       return dirtyResult();
     }
 
     // Otherwise add a freehand waypoint on grid
     this.waypoints.push(gridPoint);
+    this.waypointLayers.push(this.currentLayerId!);
     this.updatePreview(ops);
     return dirtyResult();
   }
@@ -83,6 +93,7 @@ export class TraceTool implements ToolHandler {
     if (!this.active) return NOOP_RESULT;
     const gridPoint = snapToGrid(event.worldPoint, ctx.gridConfig).point;
     this.waypoints.push(gridPoint);
+    this.waypointLayers.push(this.currentLayerId!);
     this.commitTrace(ctx, ops);
     return dirtyResult();
   }
@@ -100,11 +111,64 @@ export class TraceTool implements ToolHandler {
 
     if (event.key === 'Backspace' && this.active && this.waypoints.length > 1) {
       this.waypoints.pop();
+      this.waypointLayers.pop();
+      // Remove any via at the popped waypoint
+      const lastPt = this.waypoints[this.waypoints.length - 1];
+      this.vias = this.vias.filter(
+        (v) => !(v.position.x === lastPt.x && v.position.y === lastPt.y),
+      );
+      // Restore layer to whatever the last waypoint was on
+      this.currentLayerId = this.waypointLayers[this.waypointLayers.length - 1];
       this.updatePreview(ops);
       return dirtyResult();
     }
 
+    // V key: insert via and switch layer
+    if ((event.key === 'v' || event.key === 'V') && this.active) {
+      return this.insertVia(ctx, ops);
+    }
+
     return NOOP_RESULT;
+  }
+
+  /**
+   * Insert a via at the current cursor position and switch to the next signal layer.
+   */
+  private insertVia(ctx: ToolContext, ops: ToolOperations): ToolResult {
+    const signalLayers = ctx.layers.filter((l) => l.type === 'signal');
+    if (signalLayers.length < 2) return NOOP_RESULT;
+
+    const fromLayerId = this.currentLayerId!;
+    const currentIdx = signalLayers.findIndex((l) => l.id === fromLayerId);
+    const nextIdx = (currentIdx + 1) % signalLayers.length;
+    const toLayerId = signalLayers[nextIdx].id;
+
+    const gridPoint = snapToGrid(this.cursorPoint, ctx.gridConfig).point;
+
+    // Add the current point as a waypoint (end of segment on current layer)
+    this.waypoints.push(gridPoint);
+    this.waypointLayers.push(fromLayerId);
+
+    // Create the via
+    const via: Via = {
+      id: createId('via'),
+      pathId: '' as any, // will be set on commit
+      position: { ...gridPoint },
+      fromLayerId,
+      toLayerId,
+      outerDiameter: DEFAULT_VIA_OUTER,
+      drillDiameter: DEFAULT_VIA_DRILL,
+      netId: (this.netId ?? '') as any,
+    };
+    this.vias.push(via);
+
+    // Switch layer and add a new waypoint on the new layer at the same position
+    this.currentLayerId = toLayerId;
+    this.waypoints.push(gridPoint);
+    this.waypointLayers.push(toLayerId);
+
+    this.updatePreview(ops);
+    return dirtyResult();
   }
 
   private updatePreview(ops: ToolOperations): void {
@@ -122,21 +186,31 @@ export class TraceTool implements ToolHandler {
     const segments: TraceSegment[] = [];
 
     for (let i = 0; i < this.waypoints.length - 1; i++) {
+      // Skip zero-length segments (via insertion creates two waypoints at same position)
+      const dx = this.waypoints[i + 1].x - this.waypoints[i].x;
+      const dy = this.waypoints[i + 1].y - this.waypoints[i].y;
+      if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) continue;
+
       segments.push({
         id: createId('seg'),
         pathId,
-        layerId: ctx.activeLayerId,
+        layerId: this.waypointLayers[i],
         start: { ...this.waypoints[i] },
         end: { ...this.waypoints[i + 1] },
         width: ctx.traceWidth,
       });
     }
 
+    // Patch via pathIds
+    for (const via of this.vias) {
+      via.pathId = pathId;
+    }
+
     const tracePath: TracePath = {
       id: pathId,
       netId: (this.netId ?? createId('net')) as any,
       segments,
-      vias: [],
+      vias: this.vias,
       debugLinks: [],
       cornerRadius: 0,
     };
@@ -152,9 +226,12 @@ export class TraceTool implements ToolHandler {
 
   private reset(ops: ToolOperations): void {
     this.waypoints = [];
+    this.waypointLayers = [];
+    this.vias = [];
     this.active = false;
     this.startPadId = null;
     this.netId = null;
+    this.currentLayerId = null;
     this.cursorPoint = { x: 0, y: 0 };
     ops.setActiveTrace(null);
   }

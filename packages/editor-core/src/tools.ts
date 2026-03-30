@@ -1,4 +1,4 @@
-import type { Point2D, GridConfig, LayerId } from '@pcb/domain';
+import type { Point2D, GridConfig, LayerId, BoardLayer } from '@pcb/domain';
 import type { ViewportState } from './viewport';
 import type { SelectionState } from './selection';
 
@@ -33,6 +33,8 @@ export interface ToolContext {
   gridConfig: GridConfig;
   activeLayerId: LayerId;
   traceWidth: number;
+  /** All board layers -- used by the trace tool to cycle signal layers for via placement */
+  layers: BoardLayer[];
 }
 
 export interface ToolState {
