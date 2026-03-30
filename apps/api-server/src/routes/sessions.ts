@@ -1,6 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { Store } from '../store';
 import type { SessionManager, ClientMessage, BoardAction } from '../session';
+import {
+  createId,
+  type ComponentId,
+  type TracePathId,
+  type TraceSegmentId,
+  type ViaId,
+  type NetId,
+} from '@pcb/domain';
 
 export async function sessionRoutes(
   app: FastifyInstance,
@@ -305,42 +313,104 @@ function applyBoardAction(
   boardId: string,
   action: BoardAction,
 ): unknown {
+  const data = (action as any).data;
+
   switch (action.kind) {
-    case 'component:create':
-      return store.components.create({ ...(action.data as any), boardId });
+    case 'component:create': {
+      const id = createId<ComponentId>('cmp');
+      return store.components.create({
+        id,
+        name: data.name,
+        designator: data.designator,
+        footprint: data.footprint,
+        transform: data.transform,
+        layerId: data.layerId,
+        properties: data.properties ?? {},
+        locked: data.locked ?? false,
+        boardId,
+      });
+    }
 
     case 'component:update':
-      return store.components.update(action.id, action.data as any);
+      return store.components.update(action.id, data);
 
     case 'component:delete':
       return store.components.delete(action.id);
 
-    case 'path:create':
-      return store.paths.create({ ...(action.data as any), boardId });
+    case 'path:create': {
+      const pathId = createId<TracePathId>('trc');
+      const segments = (data.segments ?? []).map((s: any) => ({
+        id: createId<TraceSegmentId>('seg'),
+        pathId,
+        ...s,
+      }));
+      const vias = (data.vias ?? []).map((v: any) => ({
+        id: createId<ViaId>('via'),
+        pathId,
+        ...v,
+      }));
+      return store.paths.create({
+        id: pathId,
+        netId: data.netId,
+        segments,
+        vias,
+        debugLinks: [],
+        cornerRadius: 0,
+        boardId,
+      });
+    }
 
-    case 'path:update':
-      return store.paths.update(action.id, action.data as any);
+    case 'path:update': {
+      const existing = store.paths.getById(action.id);
+      if (!existing) return null;
+      const updates: Record<string, unknown> = {};
+      if (data.segments) {
+        updates.segments = data.segments.map((s: any) => ({
+          id: createId<TraceSegmentId>('seg'),
+          pathId: existing.id,
+          ...s,
+        }));
+      }
+      if (data.vias) {
+        updates.vias = data.vias.map((v: any) => ({
+          id: createId<ViaId>('via'),
+          pathId: existing.id,
+          ...v,
+        }));
+      }
+      return store.paths.update(action.id, updates as any);
+    }
 
     case 'path:delete':
       return store.paths.delete(action.id);
 
-    case 'net:create':
-      return store.nets.create({ ...(action.data as any), boardId });
+    case 'net:create': {
+      return store.nets.create({
+        id: createId<NetId>('net'),
+        name: data.name,
+        pins: data.pins ?? [],
+        pads: data.pads ?? [],
+        paths: [],
+        color: data.color,
+        netClass: data.netClass,
+        boardId,
+      });
+    }
 
     case 'net:update':
-      return store.nets.update(action.id, action.data as any);
+      return store.nets.update(action.id, data);
 
     case 'net:delete':
       return store.nets.delete(action.id);
 
     case 'layer:update': {
       const board = store.boards.getById(boardId);
-      if (board) store.boards.update(boardId, action.data as any);
+      if (board) store.boards.update(boardId, data);
       return store.boards.getById(boardId);
     }
 
     case 'board:update':
-      return store.boards.update(boardId, action.data as any);
+      return store.boards.update(boardId, data);
 
     default:
       return null;
