@@ -5,33 +5,223 @@ import { useStore } from '../../store';
 import { milsToUnits } from '@pcb/render-three';
 import type { Component, TracePath, BoardLayer } from '@pcb/domain';
 
-function buildComponentMesh(comp: Component, boardTop: number): THREE.Mesh {
-  const bb = comp.footprint.boundingBox;
-  const compW = milsToUnits(bb.max.x - bb.min.x);
-  const compH = milsToUnits(bb.max.y - bb.min.y);
-  const compHeight = milsToUnits(20);
-  const geo = new THREE.BoxGeometry(compW, compHeight, compH);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(
-    milsToUnits(comp.transform.position.x),
-    boardTop + compHeight / 2,
-    milsToUnits(comp.transform.position.y),
-  );
-  mesh.name = `comp:${comp.id}`;
-  mesh.userData.layerId = comp.layerId;
-  return mesh;
+// ─── Board Constants ────────────────────────────────────────────────────────
+
+const BOARD_THICKNESS = 62;   // mils (1.6 mm)
+const COPPER_THICKNESS = 1.4; // mils (1 oz copper)
+const MASK_THICKNESS = 0.8;
+const SILK_THICKNESS = 0.3;
+
+// ─── Layer Z-Offset Computation ─────────────────────────────────────────────
+
+/**
+ * Compute the Y position (mils) for every layer in the stackup.
+ *
+ * Signal/plane layers are spread evenly through the board by their `order`
+ * field.  order=0 → top copper, order=copperCount-1 → bottom copper.
+ * Non-copper layers (mask, silkscreen) sit outside the board at fixed
+ * positions based on their type.
+ */
+function buildLayerZMap(
+  layers: BoardLayer[],
+  copperLayerCount: number,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  const half = BOARD_THICKNESS / 2;
+
+  for (const layer of layers) {
+    let z: number | null = null;
+
+    if (layer.type === 'signal' || layer.type === 'plane') {
+      // Interpolate between +half (top) and -half (bottom)
+      const t = copperLayerCount > 1
+        ? layer.order / (copperLayerCount - 1)
+        : 0;
+      z = half - t * BOARD_THICKNESS;
+    } else {
+      switch (layer.type) {
+        case 'solder_mask_top':
+          z = half + COPPER_THICKNESS + MASK_THICKNESS / 2;
+          break;
+        case 'solder_mask_bottom':
+          z = -(half + COPPER_THICKNESS + MASK_THICKNESS / 2);
+          break;
+        case 'silkscreen_top':
+          z = half + COPPER_THICKNESS + MASK_THICKNESS + SILK_THICKNESS / 2;
+          break;
+        case 'silkscreen_bottom':
+          z = -(half + COPPER_THICKNESS + MASK_THICKNESS + SILK_THICKNESS / 2);
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (z != null) {
+      map.set(layer.id, z);
+    }
+  }
+
+  return map;
 }
 
-function buildTraceMeshes(trace: TracePath, boardTop: number): THREE.Group {
+// ─── Layer Slab Rendering Info ──────────────────────────────────────────────
+
+interface LayerSlabInfo {
+  y: number;
+  height: number;
+  color: number;
+  opacity: number;
+  metalness: number;
+  roughness: number;
+}
+
+function layerSlabInfo(
+  layer: BoardLayer,
+  layerZMap: Map<string, number>,
+): LayerSlabInfo | null {
+  const z = layerZMap.get(layer.id);
+  if (z == null) return null;
+
+  switch (layer.type) {
+    case 'signal':
+      return {
+        y: z, height: milsToUnits(COPPER_THICKNESS),
+        color: 0xb87333, opacity: 1, metalness: 0.7, roughness: 0.3,
+      };
+    case 'plane':
+      return {
+        y: z, height: milsToUnits(COPPER_THICKNESS),
+        color: 0xb87333, opacity: 0.85, metalness: 0.7, roughness: 0.3,
+      };
+    case 'solder_mask_top':
+    case 'solder_mask_bottom':
+      return {
+        y: z, height: milsToUnits(MASK_THICKNESS),
+        color: 0x006830, opacity: 0.85, metalness: 0, roughness: 0.4,
+      };
+    case 'silkscreen_top':
+    case 'silkscreen_bottom':
+      return {
+        y: z, height: milsToUnits(SILK_THICKNESS),
+        color: 0xeeeeee, opacity: 0.4, metalness: 0, roughness: 0.9,
+      };
+    default:
+      return null;
+  }
+}
+
+// ─── Component Mesh ─────────────────────────────────────────────────────────
+
+/** Approximate component body height (mils) by designator prefix. */
+function componentBodyHeight(designator: string): number {
+  const prefix = designator.replace(/[0-9]/g, '').toUpperCase();
+  switch (prefix) {
+    case 'R':  return 15;
+    case 'C':  return 25;
+    case 'L':  return 35;
+    case 'U':  return 45;
+    case 'J':
+    case 'P':  return 70;
+    default:   return 25;
+  }
+}
+
+function buildComponentMesh(
+  comp: Component,
+  layerZMap: Map<string, number>,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = `comp:${comp.id}`;
+  group.userData.layerId = comp.layerId;
+
+  const layerZ = layerZMap.get(comp.layerId) ?? (BOARD_THICKNESS / 2);
+  const isBottom = comp.transform.mirrored;
+
+  // Body direction: top-side grows upward (+Y), bottom-side grows downward (-Y)
+  const direction = isBottom ? -1 : 1;
+
+  const bb = comp.footprint.boundingBox;
+  const compW = milsToUnits(bb.max.x - bb.min.x);
+  const compD = milsToUnits(bb.max.y - bb.min.y);
+  const bodyH = milsToUnits(componentBodyHeight(comp.designator));
+
+  // Component body
+  const bodyGeo = new THREE.BoxGeometry(
+    Math.max(compW, milsToUnits(10)),
+    bodyH,
+    Math.max(compD, milsToUnits(10)),
+  );
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.7, metalness: 0.1 });
+  const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+  bodyMesh.position.y = direction * bodyH / 2;
+  group.add(bodyMesh);
+
+  // Pads on the layer surface
+  const padMat = new THREE.MeshStandardMaterial({ color: 0xc9a84c, metalness: 0.8, roughness: 0.3 });
+  const padThickness = milsToUnits(COPPER_THICKNESS);
+  for (const pad of comp.footprint.pads) {
+    const pw = milsToUnits(pad.width);
+    const ph = milsToUnits(pad.height);
+    let padGeo: THREE.BufferGeometry;
+    if (pad.shape === 'circle' || pad.shape === 'oval') {
+      padGeo = new THREE.CylinderGeometry(pw / 2, pw / 2, padThickness, 12);
+      if (pad.shape === 'oval') padGeo.scale(1, 1, ph / pw);
+    } else {
+      padGeo = new THREE.BoxGeometry(pw, padThickness, ph);
+    }
+    const padMesh = new THREE.Mesh(padGeo, padMat);
+    padMesh.position.set(
+      milsToUnits(pad.localPosition.x),
+      direction * padThickness / 2,
+      milsToUnits(pad.localPosition.y),
+    );
+    group.add(padMesh);
+  }
+
+  // Position the group at the component's world location on its layer
+  group.position.set(
+    milsToUnits(comp.transform.position.x),
+    milsToUnits(layerZ),
+    milsToUnits(comp.transform.position.y),
+  );
+
+  // Rotation
+  if (comp.transform.rotation) {
+    group.rotation.y = -(comp.transform.rotation * Math.PI) / 180;
+  }
+
+  // Mirror for bottom-side
+  if (isBottom) {
+    group.scale.x = -1;
+  }
+
+  return group;
+}
+
+// ─── Trace / Via Mesh ───────────────────────────────────────────────────────
+
+function buildTraceMeshes(
+  trace: TracePath,
+  layerZMap: Map<string, number>,
+): THREE.Group {
   const group = new THREE.Group();
   group.name = `trace:${trace.id}`;
-  const mat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.6, roughness: 0.3 });
-  const traceHeight = milsToUnits(1.4);
-  // Tag group with the layer of the first segment
   group.userData.layerId = trace.segments[0]?.layerId ?? '';
 
+  const copperMat = new THREE.MeshStandardMaterial({
+    color: 0xb87333, metalness: 0.6, roughness: 0.3,
+  });
+  const viaMat = new THREE.MeshStandardMaterial({
+    color: 0xc9a84c, metalness: 0.8, roughness: 0.2,
+  });
+  const holeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+  const traceHeight = milsToUnits(COPPER_THICKNESS);
+
+  // ── Segments: each positioned at its own layer's Z
   for (const seg of trace.segments) {
+    const zOffset = layerZMap.get(seg.layerId) ?? 0;
+
     const sx = milsToUnits(seg.start.x);
     const sz = milsToUnits(seg.start.y);
     const ex = milsToUnits(seg.end.x);
@@ -43,50 +233,62 @@ function buildTraceMeshes(trace: TracePath, boardTop: number): THREE.Group {
 
     const w = milsToUnits(seg.width);
     const geo = new THREE.BoxGeometry(len, traceHeight, w);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set((sx + ex) / 2, boardTop + traceHeight / 2, (sz + ez) / 2);
+    const mesh = new THREE.Mesh(geo, copperMat);
+    mesh.position.set((sx + ex) / 2, milsToUnits(zOffset), (sz + ez) / 2);
     mesh.rotation.y = -Math.atan2(dz, dx);
+    mesh.userData.layerId = seg.layerId;
     group.add(mesh);
+  }
+
+  // ── Vias: copper cylinder spanning fromLayer to toLayer
+  for (const via of trace.vias) {
+    const fromZ = layerZMap.get(via.fromLayerId) ?? 0;
+    const toZ = layerZMap.get(via.toLayerId) ?? 0;
+    const topY = milsToUnits(Math.max(fromZ, toZ));
+    const bottomY = milsToUnits(Math.min(fromZ, toZ));
+    const height = Math.abs(topY - bottomY) || milsToUnits(BOARD_THICKNESS);
+    const centerY = (topY + bottomY) / 2;
+
+    const outerR = milsToUnits(via.outerDiameter / 2);
+    const innerR = milsToUnits(via.drillDiameter / 2);
+
+    // Outer copper barrel
+    const outerGeo = new THREE.CylinderGeometry(outerR, outerR, height, 12);
+    const outerMesh = new THREE.Mesh(outerGeo, viaMat);
+    group.add(outerMesh);
+
+    // Inner drill hole (dark)
+    const innerGeo = new THREE.CylinderGeometry(innerR, innerR, height + 0.0001, 8);
+    const innerMesh = new THREE.Mesh(innerGeo, holeMat);
+    group.add(innerMesh);
+
+    // Annular ring pads at top and bottom of via
+    const ringGeo = new THREE.CylinderGeometry(outerR, outerR, milsToUnits(COPPER_THICKNESS), 12);
+    const ringTop = new THREE.Mesh(ringGeo, viaMat);
+    ringTop.position.y = height / 2;
+    group.add(ringTop);
+    const ringBot = new THREE.Mesh(ringGeo.clone(), viaMat);
+    ringBot.position.y = -height / 2;
+    group.add(ringBot);
+
+    // Position the via group
+    const viaGroup = new THREE.Group();
+    viaGroup.add(outerMesh);
+    viaGroup.add(innerMesh);
+    viaGroup.add(ringTop);
+    viaGroup.add(ringBot);
+    viaGroup.position.set(
+      milsToUnits(via.position.x),
+      centerY,
+      milsToUnits(via.position.y),
+    );
+    group.add(viaGroup);
   }
 
   return group;
 }
 
-/** Map layer type to 3D rendering info */
-function layerZ(layer: BoardLayer, thickness: number, maskH: number, silkH: number): {
-  y: number; height: number; color: number; opacity: number; metalness: number; roughness: number;
-} | null {
-  switch (layer.type) {
-    case 'signal':
-      // Copper layers — thin metallic
-      return {
-        y: layer.order <= 2 ? thickness / 2 + maskH + milsToUnits(0.7) : -(thickness / 2 + maskH + milsToUnits(0.7)),
-        height: milsToUnits(1.4), color: 0xb87333, opacity: 1, metalness: 0.7, roughness: 0.3,
-      };
-    case 'solder_mask_top':
-      return {
-        y: thickness / 2 + maskH / 2,
-        height: maskH, color: 0x006830, opacity: 0.85, metalness: 0, roughness: 0.4,
-      };
-    case 'solder_mask_bottom':
-      return {
-        y: -(thickness / 2 + maskH / 2),
-        height: maskH, color: 0x006830, opacity: 0.85, metalness: 0, roughness: 0.4,
-      };
-    case 'silkscreen_top':
-      return {
-        y: thickness / 2 + maskH + silkH / 2,
-        height: silkH, color: 0xeeeeee, opacity: 0.4, metalness: 0, roughness: 0.9,
-      };
-    case 'silkscreen_bottom':
-      return {
-        y: -(thickness / 2 + maskH + silkH / 2),
-        height: silkH, color: 0xeeeeee, opacity: 0.4, metalness: 0, roughness: 0.9,
-      };
-    default:
-      return null;
-  }
-}
+// ─── Main Component ─────────────────────────────────────────────────────────
 
 export function Canvas3D() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,13 +393,15 @@ export function Canvas3D() {
 
     const w = milsToUnits(currentBoard.workspace.width);
     const h = milsToUnits(currentBoard.workspace.height);
-    const thickness = milsToUnits(62);
-    const maskH = milsToUnits(0.8);
-    const silkH = milsToUnits(0.3);
-    const copperH = milsToUnits(1.4);
-    const boardTop = thickness / 2 + maskH + copperH;
+    const thickness = milsToUnits(BOARD_THICKNESS);
 
-    // FR4 substrate (always visible)
+    // ── Compute layer Z positions ──
+    const copperLayerCount = currentBoard.layers.filter(
+      (l) => l.type === 'signal' || l.type === 'plane',
+    ).length;
+    const layerZMap = buildLayerZMap(currentBoard.layers, copperLayerCount);
+
+    // ── FR4 substrate ──
     const boardGeo = new THREE.BoxGeometry(w, thickness, h);
     const boardMat = new THREE.MeshStandardMaterial({ color: 0x2a6a2a, roughness: 0.7 });
     const boardMesh = new THREE.Mesh(boardGeo, boardMat);
@@ -205,9 +409,9 @@ export function Canvas3D() {
     boardMesh.name = 'pcb-substrate';
     scene.add(boardMesh);
 
-    // Per-layer slabs
+    // ── Layer slabs (copper, mask, silkscreen — each at correct Z) ──
     for (const layer of currentBoard.layers) {
-      const info = layerZ(layer, thickness, maskH, silkH);
+      const info = layerSlabInfo(layer, layerZMap);
       if (!info) continue;
 
       const geo = new THREE.BoxGeometry(w, info.height, h);
@@ -219,20 +423,20 @@ export function Canvas3D() {
         opacity: info.opacity,
       });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(w / 2, info.y, h / 2);
+      mesh.position.set(w / 2, milsToUnits(info.y), h / 2);
       mesh.name = `layer:${layer.id}`;
       mesh.visible = layer.visible;
       scene.add(mesh);
     }
 
-    // Components — always visible regardless of layer toggle
+    // ── Components — positioned on their respective layer ──
     for (const comp of components) {
-      scene.add(buildComponentMesh(comp, boardTop));
+      scene.add(buildComponentMesh(comp, layerZMap));
     }
 
-    // Traces — always visible regardless of layer toggle
+    // ── Traces — each segment on its layer, vias spanning layers ──
     for (const trace of traces) {
-      scene.add(buildTraceMeshes(trace, thickness / 2 + copperH / 2));
+      scene.add(buildTraceMeshes(trace, layerZMap));
     }
 
     // Fit camera only on first build
@@ -246,14 +450,11 @@ export function Canvas3D() {
   }, [currentBoard, components, traces]);
 
   // Sync layer visibility without full rebuild
-  // Layer slabs and components follow layer visibility.
-  // Traces are always visible (they represent the actual copper routing).
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
 
     for (const layer of layers) {
-      // Only toggle the layer slab mesh itself — traces and components stay visible
       const layerMesh = scene.getObjectByName(`layer:${layer.id}`);
       if (layerMesh) layerMesh.visible = layer.visible;
     }

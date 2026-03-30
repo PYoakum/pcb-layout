@@ -56,6 +56,10 @@ export class ComponentBuilder {
     const height = componentHeight(component.designator);
     const bodyH = milsToUnits(height);
 
+    // Bottom-side components extend downward (-Y), top-side upward (+Y)
+    const isBottom = component.transform.mirrored;
+    const direction = isBottom ? -1 : 1;
+
     // Component body
     const bodyGeo = new THREE.BoxGeometry(
       Math.max(bodyW, milsToUnits(10)),
@@ -63,7 +67,7 @@ export class ComponentBuilder {
       Math.max(bodyD, milsToUnits(10)),
     );
     const bodyMesh = new THREE.Mesh(bodyGeo, this.bodyMaterial);
-    bodyMesh.position.y = bodyH / 2;
+    bodyMesh.position.y = direction * bodyH / 2;
     bodyMesh.name = 'body';
     bodyMesh.userData['type'] = 'component-body';
     bodyMesh.userData['componentId'] = component.id;
@@ -71,12 +75,12 @@ export class ComponentBuilder {
 
     // Pads
     for (const pad of component.footprint.pads) {
-      const padMesh = this.buildPad(pad);
+      const padMesh = this.buildPad(pad, direction);
       group.add(padMesh);
     }
 
     // Designator label sprite
-    const label = this.buildDesignatorSprite(component.designator, bodyH);
+    const label = this.buildDesignatorSprite(component.designator, direction * bodyH);
     group.add(label);
 
     // Apply component transform
@@ -87,7 +91,7 @@ export class ComponentBuilder {
       milsToUnits(pos.y),
     );
     group.rotation.y = -rotationToRadians(component.transform.rotation);
-    if (component.transform.mirrored) {
+    if (isBottom) {
       group.scale.x = -1;
     }
 
@@ -103,8 +107,8 @@ export class ComponentBuilder {
     });
   }
 
-  /** Build a pad mesh. */
-  private buildPad(pad: Pad): THREE.Mesh {
+  /** Build a pad mesh. direction: +1 for top-side, -1 for bottom-side. */
+  private buildPad(pad: Pad, direction = 1): THREE.Mesh {
     const w = milsToUnits(pad.width);
     const h = milsToUnits(pad.height);
     const padThickness = milsToUnits(1.5);
@@ -129,7 +133,7 @@ export class ComponentBuilder {
     const mesh = new THREE.Mesh(geometry, this.pinMaterial);
     mesh.position.set(
       milsToUnits(pad.localPosition.x),
-      padThickness / 2,
+      direction * padThickness / 2,
       milsToUnits(pad.localPosition.y),
     );
     if (pad.rotation) {
