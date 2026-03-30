@@ -3,6 +3,7 @@ import { useStore } from '../../store';
 import type { BoardLayer, LayerType } from '@pcb/domain';
 import { ModuleLibrary } from '../modules/ModuleLibrary';
 import { ComponentLibrary } from '../library/ComponentLibrary';
+import { SessionPanel } from '../session/SessionPanel';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -163,6 +164,10 @@ export function Sidebar() {
 
   return (
     <div className="sidebar">
+      <CollapsibleSection title="Pair Session">
+        <SessionPanel />
+      </CollapsibleSection>
+
       <CollapsibleSection title="Components">
         <ComponentLibrary />
       </CollapsibleSection>

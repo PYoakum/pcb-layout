@@ -1,7 +1,10 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import websocket from '@fastify/websocket';
 import { createStore } from './store';
 import { registerRoutes } from './routes/index';
+import { sessionRoutes } from './routes/sessions';
+import { SessionManager } from './session';
 import type { ServerConfig } from './config';
 
 export async function buildServer(config: ServerConfig) {
@@ -16,6 +19,9 @@ export async function buildServer(config: ServerConfig) {
     origin: config.corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   });
+
+  // WebSocket support
+  await app.register(websocket);
 
   // Global error handler
   app.setErrorHandler((error: Error & { statusCode?: number }, _req, reply) => {
@@ -34,8 +40,14 @@ export async function buildServer(config: ServerConfig) {
   // In-memory store
   const store = createStore();
 
+  // Session manager (shared between REST and WS)
+  const sessionMgr = new SessionManager();
+
   // Register all routes
   await registerRoutes(app, store);
+
+  // Register session routes (REST + WebSocket)
+  await sessionRoutes(app, store, sessionMgr);
 
   return app;
 }

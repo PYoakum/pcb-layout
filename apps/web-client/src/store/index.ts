@@ -5,8 +5,9 @@ import { createEditorSlice, type EditorSlice } from './editor-slice';
 import { createUiSlice, type UiSlice } from './ui-slice';
 import { createModuleSlice, type ModuleSlice } from './module-slice';
 import { createDebugSlice, type DebugSlice } from './debug-slice';
+import { createSessionSlice, type SessionSlice } from './session-slice';
 
-export type AppStore = ProjectSlice & BoardSlice & EditorSlice & UiSlice & ModuleSlice & DebugSlice;
+export type AppStore = ProjectSlice & BoardSlice & EditorSlice & UiSlice & ModuleSlice & DebugSlice & SessionSlice;
 
 export const useStore = create<AppStore>()((...args) => ({
   ...createProjectSlice(...args),
@@ -15,6 +16,7 @@ export const useStore = create<AppStore>()((...args) => ({
   ...createUiSlice(...args),
   ...createModuleSlice(...args),
   ...createDebugSlice(...args),
+  ...createSessionSlice(...args),
 }));
 
 // Convenience selector hooks
