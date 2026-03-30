@@ -1,0 +1,65 @@
+{
+  "appId": "com.pcblayout.app",
+  "productName": "PCB Layout",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "renderer/**/*"
+  ],
+  "fileAssociations": [
+    {
+      "ext": "pcb",
+      "name": "PCB Layout Project",
+      "description": "PCB Layout Project File",
+      "mimeType": "application/x-pcb-layout",
+      "role": "Editor"
+    }
+  ],
+  "mac": {
+    "category": "public.app-category.developer-tools",
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      },
+      {
+        "target": "zip",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "icon": "build/icon.icns"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "build/icon.ico"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      },
+      {
+        "target": "deb",
+        "arch": ["x64"]
+      }
+    ],
+    "category": "Development",
+    "icon": "build/icons"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true
+  }
+}

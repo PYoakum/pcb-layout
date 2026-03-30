@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/api-contracts" },
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/editor-core" },
+    { "path": "../../packages/render-pixi" },
+    { "path": "../../packages/render-three" },
+    { "path": "../../packages/ui-components" }
+  ]
+}

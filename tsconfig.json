@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/domain" },
+    { "path": "packages/api-contracts" },
+    { "path": "packages/editor-core" },
+    { "path": "packages/rules-engine" },
+    { "path": "packages/render-pixi" },
+    { "path": "packages/render-three" },
+    { "path": "packages/ui-components" },
+    { "path": "packages/project-serialization" },
+    { "path": "apps/api-server" },
+    { "path": "apps/web-client" },
+    { "path": "apps/electron-client" }
+  ]
+}

@@ -1,0 +1,347 @@
+/* ── Modal Overlay ── */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Dialog Container ── */
+.dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 420px;
+  max-width: 600px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dialog__close {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+.dialog__close:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.dialog__body {
+  padding: 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Form Fields ── */
+.dialog__field {
+  margin-bottom: 14px;
+}
+
+.dialog__field:last-child {
+  margin-bottom: 0;
+}
+
+.dialog__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.dialog__input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+.dialog__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.dialog__textarea {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 60px;
+  font-family: var(--font-ui);
+}
+
+.dialog__textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.dialog__select {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 13px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+}
+
+.dialog__select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Inline Row ── */
+.dialog__row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.dialog__row .dialog__field {
+  flex: 1;
+}
+
+.dialog__hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ── Buttons ── */
+.dialog__btn {
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dialog__btn--primary {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+.dialog__btn--primary:hover {
+  background: var(--accent-hover);
+}
+
+.dialog__btn--secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.dialog__btn--secondary:hover {
+  background: var(--border);
+}
+
+.dialog__btn--danger {
+  background: var(--error);
+  color: #fff;
+}
+
+.dialog__btn--danger:hover {
+  opacity: 0.85;
+}
+
+/* ── Section Divider ── */
+.dialog__section {
+  margin-bottom: 16px;
+}
+
+.dialog__section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Layer List ── */
+.dialog__layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.dialog__layer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.dialog__layer-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.dialog__layer-row input[type="text"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.dialog__layer-row select {
+  padding: 3px 6px;
+  font-size: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.dialog__layer-color {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dialog__layer-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.dialog__layer-color::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.dialog__layer-order-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dialog__layer-order-btn {
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-secondary);
+  border-radius: 2px;
+}
+
+.dialog__layer-order-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.dialog__layer-remove-btn {
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--error);
+  border-radius: 3px;
+}
+
+.dialog__layer-remove-btn:hover {
+  background: rgba(244, 67, 54, 0.15);
+}
+
+.dialog__layer-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ── Checkbox ── */
+.dialog__checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dialog__checkbox-row input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.dialog__checkbox-label {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+/* ── Preset Buttons ── */
+.dialog__presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.dialog__preset-btn {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.dialog__preset-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.dialog__preset-btn--active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 212, 255, 0.1);
+}

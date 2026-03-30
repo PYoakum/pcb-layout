@@ -1,0 +1,334 @@
+/* ── App Shell ── */
+.app-shell {
+  display: grid;
+  grid-template-areas:
+    "toolbar      toolbar       toolbar"
+    "sidebar      canvas        properties"
+    "sidebar      bottom-panel  properties"
+    "statusbar    statusbar     statusbar";
+  grid-template-rows: var(--toolbar-height) 1fr auto var(--statusbar-height);
+  grid-template-columns: var(--sidebar-width) 1fr var(--properties-width);
+  height: 100vh;
+  width: 100vw;
+}
+
+.app-shell--debug-open {
+  grid-template-rows: var(--toolbar-height) 1fr 250px var(--statusbar-height);
+}
+
+.app-shell--sidebar-collapsed {
+  grid-template-columns: 0px 1fr var(--properties-width);
+}
+
+.app-shell--properties-collapsed {
+  grid-template-columns: var(--sidebar-width) 1fr 0px;
+}
+
+.app-shell--sidebar-collapsed.app-shell--properties-collapsed {
+  grid-template-columns: 0px 1fr 0px;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  grid-area: toolbar;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.toolbar__project-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent);
+  margin-right: 12px;
+  white-space: nowrap;
+}
+
+.toolbar__separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 6px;
+}
+
+.toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.toolbar__btn {
+  padding: 4px 10px;
+  border-radius: 3px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.toolbar__btn:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.toolbar__btn--active {
+  background: var(--bg-surface);
+  color: var(--accent);
+}
+
+.toolbar__spacer {
+  flex: 1;
+}
+
+.toolbar__toggle {
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.toolbar__toggle:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.toolbar__toggle--active {
+  background: var(--accent);
+  color: var(--bg-primary);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar__section {
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+}
+
+.sidebar__section-header:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.sidebar__section-toggle {
+  font-size: 10px;
+  transition: transform 0.15s;
+}
+
+.sidebar__section-toggle--collapsed {
+  transform: rotate(-90deg);
+}
+
+.sidebar__section-body {
+  padding: 4px 0;
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sidebar__item:hover {
+  background: rgba(0, 212, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.sidebar__item--active {
+  color: var(--accent);
+  background: rgba(0, 212, 255, 0.12);
+}
+
+/* Layer item */
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 16px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.layer-item:hover {
+  background: rgba(0, 212, 255, 0.08);
+}
+
+.layer-item--active {
+  background: rgba(0, 212, 255, 0.12);
+}
+
+.layer-item__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.layer-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.layer-item__action {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+
+.layer-item__action:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface);
+}
+
+.layer-item__action--off {
+  opacity: 0.35;
+}
+
+/* ── Canvas Area ── */
+.canvas-area {
+  grid-area: canvas;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-area__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  user-select: none;
+}
+
+/* ── Properties Panel ── */
+.properties-panel {
+  grid-area: properties;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.properties-panel__header {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.properties-panel__empty {
+  padding: 20px 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.properties-panel__section {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.properties-panel__section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.properties-panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.properties-panel__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.properties-panel__value {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.properties-panel__input {
+  width: 80px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 1px 4px;
+}
+
+/* ── Status Bar ── */
+.statusbar {
+  grid-area: statusbar;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 10px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.statusbar__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.statusbar__label {
+  color: var(--text-secondary);
+}
+
+.statusbar__value {
+  color: var(--text-primary);
+}
+
+.statusbar__spacer {
+  flex: 1;
+}

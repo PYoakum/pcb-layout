@@ -1,0 +1,27 @@
+{
+  "name": "@pcb/electron-client",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "./dist/main.js",
+  "types": "./dist/main.d.ts",
+  "exports": {
+    ".": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "start": "electron ./dist/main.js",
+    "package": "electron-builder --config electron-builder.json",
+    "package:mac": "electron-builder --config electron-builder.json --mac",
+    "package:win": "electron-builder --config electron-builder.json --win",
+    "package:linux": "electron-builder --config electron-builder.json --linux"
+  },
+  "dependencies": {
+    "@pcb/domain": "*",
+    "@pcb/editor-core": "*"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

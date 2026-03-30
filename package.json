@@ -1,0 +1,22 @@
+{
+  "name": "pcb-layout",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "bun run dev:api & bun run dev:web & wait",
+    "dev:api": "bun run --watch apps/api-server/src/index.ts",
+    "dev:web": "bunx vite --config apps/web-client/vite.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "echo \"No linter configured yet\""
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "vitest": "^3.0.0"
+  }
+}

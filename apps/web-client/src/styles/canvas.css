@@ -1,0 +1,128 @@
+/* ── Canvas container wrappers ── */
+
+.canvas-container-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.canvas-mode-layer {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.25s ease-in-out;
+}
+
+.canvas-mode-layer--active {
+  opacity: 1;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.canvas-mode-layer--hidden {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Individual canvas containers ── */
+
+.canvas-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Cursor styles based on active tool ── */
+
+.canvas-container--cursor-pointer {
+  cursor: default;
+}
+
+.canvas-container--cursor-crosshair {
+  cursor: crosshair;
+}
+
+.canvas-container--cursor-grab {
+  cursor: grab;
+}
+
+.canvas-container--cursor-grab:active {
+  cursor: grabbing;
+}
+
+/* ── Canvas toolbar ── */
+
+.canvas-toolbar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+
+  /* Glass-morphism */
+  background: rgba(26, 26, 46, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.canvas-toolbar__btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.canvas-toolbar__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.canvas-toolbar__btn--active {
+  background: rgba(80, 140, 255, 0.25);
+  border-color: rgba(80, 140, 255, 0.5);
+  color: #fff;
+}
+
+.canvas-toolbar__zoom-display {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: center;
+  padding: 0 4px;
+  user-select: none;
+}
+
+.canvas-toolbar__divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
