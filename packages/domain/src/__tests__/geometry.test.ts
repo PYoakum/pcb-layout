@@ -8,8 +8,8 @@ import {
 import type { GridConfig, Point2D } from '../types/geometry';
 
 const defaultGrid: GridConfig = {
-  spacingX: 50,
-  spacingY: 50,
+  spacingX: 5,
+  spacingY: 5,
   subdivisions: 2,
   visible: true,
   snapEnabled: true,
@@ -18,7 +18,7 @@ const defaultGrid: GridConfig = {
 describe('snapToGrid', () => {
   it('snaps a point to the nearest grid intersection', () => {
     const result = snapToGrid({ x: 73, y: 118 }, defaultGrid);
-    expect(result).toEqual({ x: 50, y: 100 });
+    expect(result).toEqual({ x: 75, y: 120 });
   });
 
   it('handles point already on grid', () => {
@@ -33,13 +33,13 @@ describe('snapToGrid', () => {
 
   it('handles negative coordinates', () => {
     const result = snapToGrid({ x: -73, y: -118 }, defaultGrid);
-    expect(result).toEqual({ x: -50, y: -100 });
+    expect(result).toEqual({ x: -75, y: -120 });
   });
 
   it('rounds to nearest, not floor', () => {
-    // 26 is closer to 50 than 0 with spacing 50
-    const result = snapToGrid({ x: 26, y: 26 }, defaultGrid);
-    expect(result).toEqual({ x: 50, y: 50 });
+    // 3 is closer to 5 than 0 with spacing 5
+    const result = snapToGrid({ x: 3, y: 3 }, defaultGrid);
+    expect(result).toEqual({ x: 5, y: 5 });
   });
 
   it('supports different X and Y spacing', () => {

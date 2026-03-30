@@ -55,7 +55,7 @@ export class EditorController {
   // Editor state
   private selection: SelectionState = createSelectionState();
   private viewport: ViewportState = createViewport();
-  private gridConfig: GridConfig = { spacingX: 50, spacingY: 50, subdivisions: 2, visible: true, snapEnabled: true };
+  private gridConfig: GridConfig = { spacingX: 5, spacingY: 5, subdivisions: 2, visible: true, snapEnabled: true };
   private activeLayerId: LayerId = '' as LayerId;
   private traceWidth = 10;
 

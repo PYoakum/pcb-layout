@@ -4,8 +4,8 @@ import type { SnapCandidate } from '../snap';
 import type { GridConfig } from '@pcb/domain';
 
 const grid: GridConfig = {
-  spacingX: 50,
-  spacingY: 50,
+  spacingX: 5,
+  spacingY: 5,
   subdivisions: 2,
   visible: true,
   snapEnabled: true,
@@ -16,7 +16,7 @@ const gridNoSnap: GridConfig = { ...grid, snapEnabled: false };
 describe('snapToGrid', () => {
   it('snaps to grid spacing', () => {
     const result = snapToGrid({ x: 73, y: 118 }, grid);
-    expect(result.point).toEqual({ x: 50, y: 100 });
+    expect(result.point).toEqual({ x: 75, y: 120 });
     expect(result.snappedTo).not.toBeNull();
     expect(result.snappedTo!.type).toBe(SnapTargetType.Grid);
     expect(result.axis).toBe('both');
@@ -38,13 +38,13 @@ describe('snapToGrid', () => {
   it('reports correct axis when only x snaps', () => {
     // y already on grid, x needs snapping
     const result = snapToGrid({ x: 73, y: 100 }, grid);
-    expect(result.point).toEqual({ x: 50, y: 100 });
+    expect(result.point).toEqual({ x: 75, y: 100 });
     expect(result.axis).toBe('x');
   });
 
   it('reports correct axis when only y snaps', () => {
     const result = snapToGrid({ x: 100, y: 118 }, grid);
-    expect(result.point).toEqual({ x: 100, y: 100 });
+    expect(result.point).toEqual({ x: 100, y: 120 });
     expect(result.axis).toBe('y');
   });
 });
@@ -99,7 +99,7 @@ describe('snapPoint', () => {
       { id: 'pad_1', point: { x: 1000, y: 1000 }, type: SnapTargetType.PadCenter },
     ];
     const result = snapPoint({ x: 73, y: 118 }, candidates, 20, grid);
-    expect(result.point).toEqual({ x: 50, y: 100 });
+    expect(result.point).toEqual({ x: 75, y: 120 });
     expect(result.snappedTo).not.toBeNull();
     expect(result.snappedTo!.type).toBe(SnapTargetType.Grid);
   });

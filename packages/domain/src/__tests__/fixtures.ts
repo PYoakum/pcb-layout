@@ -52,8 +52,8 @@ export function createTestWorkspaceConfig(overrides?: Partial<WorkspaceConfig>):
     width: 5000,
     height: 4000,
     grid: {
-      spacingX: 50,
-      spacingY: 50,
+      spacingX: 5,
+      spacingY: 5,
       subdivisions: 2,
       visible: true,
       snapEnabled: true,

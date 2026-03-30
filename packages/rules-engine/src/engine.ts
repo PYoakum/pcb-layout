@@ -121,7 +121,7 @@ export class ValidationEngine {
       workspace: {
         width: module.boundingBox.max.x - module.boundingBox.min.x,
         height: module.boundingBox.max.y - module.boundingBox.min.y,
-        grid: { spacingX: 50, spacingY: 50, subdivisions: 2, visible: true, snapEnabled: false },
+        grid: { spacingX: 5, spacingY: 5, subdivisions: 2, visible: true, snapEnabled: false },
         layerCount: 2,
       },
       layers: [],
