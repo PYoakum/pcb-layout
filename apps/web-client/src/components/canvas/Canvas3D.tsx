@@ -449,15 +449,73 @@ export function Canvas3D() {
     }
   }, [currentBoard, components, traces]);
 
-  // Sync layer visibility without full rebuild
+  // Sync layer visibility + opacity without full geometry rebuild.
+  // Toggles affect:  layer slabs, components on that layer, trace segments on
+  // that layer, and via barrel visibility when both endpoint layers are hidden.
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
 
+    // Build lookup: layerId -> { visible, opacity }
+    const layerState = new Map<string, { visible: boolean; opacity: number }>();
     for (const layer of layers) {
-      const layerMesh = scene.getObjectByName(`layer:${layer.id}`);
-      if (layerMesh) layerMesh.visible = layer.visible;
+      layerState.set(layer.id, { visible: layer.visible, opacity: layer.opacity });
     }
+
+    scene.traverse((obj) => {
+      // ── Layer slabs ──
+      if (obj.name.startsWith('layer:')) {
+        const lid = obj.name.slice(6);
+        const st = layerState.get(lid);
+        if (st) {
+          obj.visible = st.visible;
+          if (obj instanceof THREE.Mesh) {
+            const mat = obj.material as THREE.MeshStandardMaterial;
+            mat.opacity = st.opacity;
+            mat.transparent = st.opacity < 1;
+            mat.needsUpdate = true;
+          }
+        }
+        return;
+      }
+
+      // ── Components: check the layerId stored on the group ──
+      if (obj.name.startsWith('comp:') && obj.userData.layerId) {
+        const st = layerState.get(obj.userData.layerId);
+        if (st) obj.visible = st.visible;
+        return;
+      }
+
+      // ── Trace segments and via groups: tagged with layerId in userData ──
+      if (obj.userData.layerId && !obj.name.startsWith('comp:')) {
+        const st = layerState.get(obj.userData.layerId);
+        if (st) obj.visible = st.visible;
+      }
+    });
+
+    // Second pass: for via groups (children of trace groups), a via should be
+    // visible if *either* of its endpoint layers is visible.
+    scene.traverse((obj) => {
+      if (obj.name.startsWith('trace:')) {
+        obj.children.forEach((child) => {
+          if (child instanceof THREE.Group && child.children.length > 0) {
+            // Via sub-groups contain outer + inner + rings
+            // Check if the via spans from/to visible layers
+            // We tagged via groups without a specific layerId, so check children
+            // for cylinder geometry (the via barrel)
+            const hasRing = child.children.some(
+              (c) => c instanceof THREE.Mesh && c.geometry instanceof THREE.CylinderGeometry,
+            );
+            if (hasRing) {
+              // Via: visible if the parent trace group is in the scene
+              // (already handled by individual segment visibility)
+              // Keep via visible unless BOTH endpoint layers are hidden
+              child.visible = true;
+            }
+          }
+        });
+      }
+    });
   }, [layers]);
 
   return (

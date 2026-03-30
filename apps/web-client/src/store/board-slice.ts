@@ -12,6 +12,7 @@ export interface BoardSlice {
   setLayers: (layers: BoardLayer[]) => void;
   toggleLayerVisibility: (layerId: LayerId) => void;
   toggleLayerLock: (layerId: LayerId) => void;
+  setLayerOpacity: (layerId: LayerId, opacity: number) => void;
   setWorkspaceConfig: (config: WorkspaceConfig | null) => void;
   setBoardLoading: (loading: boolean) => void;
   setBoardError: (error: string | null) => void;
@@ -50,6 +51,20 @@ export const createBoardSlice: StateCreator<BoardSlice> = (set) => ({
     set((state) => {
       const newLayers = state.layers.map((l) =>
         l.id === layerId ? { ...l, locked: !l.locked } : l
+      );
+      return {
+        layers: newLayers,
+        currentBoard: state.currentBoard
+          ? { ...state.currentBoard, layers: newLayers }
+          : null,
+      };
+    }),
+
+  setLayerOpacity: (layerId, opacity) =>
+    set((state) => {
+      const clamped = Math.max(0, Math.min(1, opacity));
+      const newLayers = state.layers.map((l) =>
+        l.id === layerId ? { ...l, opacity: clamped } : l
       );
       return {
         layers: newLayers,

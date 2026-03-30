@@ -166,14 +166,27 @@
   background: rgba(0, 212, 255, 0.12);
 }
 
+/* Layer group header */
+.layer-group__header {
+  padding: 4px 10px 2px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  margin-top: 4px;
+}
+
 /* Layer item */
 .layer-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 16px;
+  gap: 5px;
+  padding: 3px 8px 3px 12px;
   font-size: 12px;
   cursor: pointer;
+  min-height: 26px;
 }
 
 .layer-item:hover {
@@ -184,11 +197,29 @@
   background: rgba(0, 212, 255, 0.12);
 }
 
+.layer-item--hidden {
+  opacity: 0.5;
+}
+
 .layer-item__swatch {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.layer-item__stack-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 22px;
+  text-align: center;
+  line-height: 16px;
 }
 
 .layer-item__name {
@@ -197,13 +228,65 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-primary);
+  font-size: 11px;
+}
+
+.layer-item__type {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 14px;
+}
+
+.layer-item__type--copper {
+  background: rgba(184, 115, 51, 0.25);
+  color: #d4a06a;
+}
+
+.layer-item__type--mask {
+  background: rgba(0, 128, 0, 0.2);
+  color: #66bb6a;
+}
+
+.layer-item__type--silk {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+}
+
+.layer-item__type--paste {
+  background: rgba(180, 180, 180, 0.15);
+  color: #aaa;
+}
+
+.layer-item__type--other {
+  background: rgba(128, 128, 128, 0.15);
+  color: #999;
+}
+
+.layer-item__opacity {
+  width: 40px;
+  height: 12px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.layer-item__opacity:hover {
+  opacity: 1;
 }
 
 .layer-item__action {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-secondary);
   padding: 0 3px;
   border-radius: 2px;
+  min-width: 16px;
+  text-align: center;
 }
 
 .layer-item__action:hover {
