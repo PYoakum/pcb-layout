@@ -7,6 +7,9 @@ const HOVER_COLOR = 0xffff00;
 const GHOST_ALPHA = 0.4;
 const BODY_ALPHA = 0.6;
 const PAD_ALPHA = 0.9;
+const GOLD_PAD_COLOR = 0xd4a017;     // gold finger pad color
+const GOLD_PAD_OUTLINE = 0xb8860b;   // darker gold outline
+const EDGE_BODY_COLOR = 0x1a1a1a;    // dark slot body
 const TEXT_STYLE = { fontFamily: 'monospace', fontSize: 10, fill: 0xffffff };
 const SILK_TEXT_STYLE = { fontFamily: 'monospace', fontSize: 10, fill: 0xffff00 };
 
@@ -44,6 +47,9 @@ export class ComponentRenderer {
       container.alpha = GHOST_ALPHA;
     }
 
+    const isEdgeConnector = component.properties.type === 'Card Edge'
+      || component.properties.type === 'Card Edge Dual';
+
     const gfx = new Graphics();
 
     // Component body
@@ -53,7 +59,13 @@ export class ComponentRenderer {
     const bx = bb.min.x * zoom;
     const by = bb.min.y * zoom;
 
-    gfx.rect(bx, by, bw, bh).fill({ color: opts.layerColor, alpha: BODY_ALPHA });
+    if (isEdgeConnector) {
+      // Edge connector: dark slot body with border
+      gfx.rect(bx, by, bw, bh).fill({ color: EDGE_BODY_COLOR, alpha: 0.85 });
+      gfx.rect(bx, by, bw, bh).stroke({ color: 0x444444, width: 1.5, alpha: 0.9 });
+    } else {
+      gfx.rect(bx, by, bw, bh).fill({ color: opts.layerColor, alpha: BODY_ALPHA });
+    }
 
     if (opts.selected) {
       gfx.rect(bx - 2, by - 2, bw + 4, bh + 4).stroke({ color: HIGHLIGHT_COLOR, width: 2, alpha: 1 });
@@ -65,7 +77,9 @@ export class ComponentRenderer {
 
     // Pads
     for (const pad of component.footprint.pads) {
-      const padGfx = this.drawPad(pad, zoom, opts.layerColor);
+      const padGfx = isEdgeConnector
+        ? this.drawEdgeFingerPad(pad, zoom)
+        : this.drawPad(pad, zoom, opts.layerColor);
       container.addChild(padGfx);
     }
 
@@ -117,6 +131,32 @@ export class ComponentRenderer {
       const dr = (pad.drillDiameter / 2) * zoom;
       gfx.circle(px, py, dr).fill({ color: 0x111111, alpha: 1 });
     }
+
+    return gfx;
+  }
+
+  /**
+   * Draw an edge connector gold-finger pad with a copper trace appearance.
+   * Rendered as a rounded gold rectangle with an outline, resembling
+   * the exposed copper fingers on a PCIe/DDR card edge.
+   */
+  private drawEdgeFingerPad(pad: Pad, zoom: number): Graphics {
+    const gfx = new Graphics();
+    const px = pad.localPosition.x * zoom;
+    const py = pad.localPosition.y * zoom;
+    const w = pad.width * zoom;
+    const h = pad.height * zoom;
+    const r = Math.min(w, h) * 0.15; // slight corner rounding
+
+    // Gold fill
+    gfx.roundRect(px - w / 2, py - h / 2, w, h, r)
+      .fill({ color: GOLD_PAD_COLOR, alpha: 0.95 });
+    // Darker outline for definition
+    gfx.roundRect(px - w / 2, py - h / 2, w, h, r)
+      .stroke({ color: GOLD_PAD_OUTLINE, width: Math.max(1, 1.5 * zoom), alpha: 1 });
+    // Center trace line (makes it look like a copper finger)
+    gfx.moveTo(px, py - h * 0.35).lineTo(px, py + h * 0.35)
+      .stroke({ color: 0xc8960f, width: Math.max(1, w * 0.3), alpha: 0.5 });
 
     return gfx;
   }

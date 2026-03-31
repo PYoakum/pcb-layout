@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Board, BoardLayer, LayerType, BoardRenderConfig, LayerRenderConfig } from '@pcb/domain';
+import type { Board, BoardLayer, BoardProfile, ProfileVertex, LayerType, BoardRenderConfig, LayerRenderConfig } from '@pcb/domain';
 import { PCBMaterials } from './materials';
 import { milsToUnits, createRoundedRectShape } from './utils';
 
@@ -107,13 +107,20 @@ export class BoardBuilder {
     const boardH = milsToUnits(config.boardThickness);
     const bevelRadius = milsToUnits(Math.min(width, height) * 0.01);
 
-    // Substrate body
-    const substrate = this.buildSubstrate(boardW, boardD, boardH, bevelRadius);
+    const outline = board.profiles?.find((p) => p.kind === 'outline');
+    const cutouts = board.profiles?.filter((p) => p.kind === 'cutout') ?? [];
+
+    // Substrate body — use custom profile if available, otherwise rectangle
+    const substrate = outline
+      ? this.buildProfileSubstrate(outline, cutouts, boardH, bevelRadius)
+      : this.buildSubstrate(boardW, boardD, boardH, bevelRadius);
     group.add(substrate);
 
-    // Layer slabs
+    // Layer slabs — use custom profile if available
     for (const layerCfg of config.layers) {
-      const slab = this.buildLayerSlab(boardW, boardD, layerCfg);
+      const slab = outline
+        ? this.buildProfileLayerSlab(outline, cutouts, layerCfg)
+        : this.buildLayerSlab(boardW, boardD, layerCfg);
       group.add(slab);
     }
 
@@ -150,6 +157,126 @@ export class BoardBuilder {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = 'substrate';
     mesh.userData['type'] = 'substrate';
+    return mesh;
+  }
+
+  /** Convert a BoardProfile to a THREE.Shape, with optional cutout holes. */
+  private profileToShape(outline: BoardProfile, cutouts: BoardProfile[] = []): THREE.Shape {
+    const shape = new THREE.Shape();
+    const verts = outline.vertices;
+    if (verts.length < 3) return shape;
+
+    shape.moveTo(milsToUnits(verts[0].x), milsToUnits(verts[0].y));
+
+    for (let i = 1; i <= verts.length; i++) {
+      const cur = verts[i % verts.length];
+      const prev = verts[(i - 1 + verts.length) % verts.length];
+      const next = verts[(i + 1) % verts.length];
+      const r = milsToUnits(cur.radius ?? 0);
+
+      if (r > 0 && i < verts.length) {
+        // Rounded corner: compute fillet arc
+        const dx1 = prev.x - cur.x;
+        const dy1 = prev.y - cur.y;
+        const dx2 = next.x - cur.x;
+        const dy2 = next.y - cur.y;
+        const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+        const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+        const clampR = Math.min(r, milsToUnits(len1) / 2, milsToUnits(len2) / 2);
+
+        if (clampR > 0.0001 && len1 > 0 && len2 > 0) {
+          const cx = milsToUnits(cur.x);
+          const cy = milsToUnits(cur.y);
+          const arcStartX = cx + (milsToUnits(dx1) / milsToUnits(len1)) * clampR;
+          const arcStartY = cy + (milsToUnits(dy1) / milsToUnits(len1)) * clampR;
+          const arcEndX = cx + (milsToUnits(dx2) / milsToUnits(len2)) * clampR;
+          const arcEndY = cy + (milsToUnits(dy2) / milsToUnits(len2)) * clampR;
+
+          shape.lineTo(arcStartX, arcStartY);
+          shape.quadraticCurveTo(cx, cy, arcEndX, arcEndY);
+          continue;
+        }
+      }
+
+      shape.lineTo(milsToUnits(cur.x), milsToUnits(cur.y));
+    }
+
+    // Add cutout holes
+    for (const cutout of cutouts) {
+      const hole = new THREE.Path();
+      const cv = cutout.vertices;
+      if (cv.length < 3) continue;
+
+      hole.moveTo(milsToUnits(cv[0].x), milsToUnits(cv[0].y));
+      for (let i = 1; i < cv.length; i++) {
+        hole.lineTo(milsToUnits(cv[i].x), milsToUnits(cv[i].y));
+      }
+      hole.closePath();
+      shape.holes.push(hole);
+    }
+
+    return shape;
+  }
+
+  /** Build substrate from a custom board profile. */
+  private buildProfileSubstrate(
+    outline: BoardProfile,
+    cutouts: BoardProfile[],
+    height: number,
+    bevelRadius: number,
+  ): THREE.Mesh {
+    const shape = this.profileToShape(outline, cutouts);
+    const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+      depth: height,
+      bevelEnabled: bevelRadius > 0,
+      bevelThickness: bevelRadius * 0.5,
+      bevelSize: bevelRadius * 0.5,
+      bevelSegments: 2,
+    };
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, height / 2, 0);
+
+    const material = PCBMaterials.substrate();
+    this.materialCache.push(material);
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = 'substrate';
+    mesh.userData['type'] = 'substrate';
+    return mesh;
+  }
+
+  /** Build a layer slab from a custom board profile. */
+  private buildProfileLayerSlab(
+    outline: BoardProfile,
+    cutouts: BoardProfile[],
+    config: LayerRenderConfig,
+  ): THREE.Mesh {
+    const shape = this.profileToShape(outline, cutouts);
+    const thickness = milsToUnits(config.thickness);
+    const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+      depth: thickness,
+      bevelEnabled: false,
+    };
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, thickness / 2, 0);
+
+    const material = new THREE.MeshStandardMaterial({
+      color: config.material.color,
+      roughness: config.material.roughness,
+      metalness: config.material.metallic ? 0.85 : 0,
+      transparent: config.material.opacity < 1,
+      opacity: config.material.opacity,
+      side: THREE.DoubleSide,
+    });
+    this.materialCache.push(material);
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.y = milsToUnits(config.zOffset);
+    mesh.name = `layer-${config.layerId}`;
+    mesh.userData['type'] = 'layer';
+    mesh.userData['layerId'] = config.layerId;
     return mesh;
   }
 

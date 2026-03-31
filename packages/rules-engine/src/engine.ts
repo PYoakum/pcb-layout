@@ -23,13 +23,18 @@ import {
   traceConnectivityChecker,
   viaDrillSizeChecker,
   viaAnnularRingChecker,
+  viaLayerConnectivityChecker,
   traceToPadAlignmentChecker,
+  traceLayerAssignmentChecker,
+  traceEndpointAlignmentChecker,
 } from './rules/trace-rules';
 import {
   componentWithinBoundsChecker,
   componentOverlapChecker,
+  componentBodyOverlapChecker,
   componentOnValidLayerChecker,
   padNetAssignmentChecker,
+  icWithinBoardEdgeChecker,
 } from './rules/component-rules';
 import {
   netConnectivityChecker,
@@ -203,11 +208,16 @@ export class ValidationEngine {
     this.registerRule(traceConnectivityChecker);
     this.registerRule(viaDrillSizeChecker);
     this.registerRule(viaAnnularRingChecker);
+    this.registerRule(viaLayerConnectivityChecker);
     this.registerRule(traceToPadAlignmentChecker);
+    this.registerRule(traceLayerAssignmentChecker);
+    this.registerRule(traceEndpointAlignmentChecker);
 
     // Component checks
     this.registerRule(componentWithinBoundsChecker);
+    this.registerRule(icWithinBoardEdgeChecker);
     this.registerRule(componentOverlapChecker);
+    this.registerRule(componentBodyOverlapChecker);
     this.registerRule(componentOnValidLayerChecker);
     this.registerRule(padNetAssignmentChecker);
 

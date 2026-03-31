@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { useStore } from '../../store';
 import { milsToUnits } from '@pcb/render-three';
-import type { Component, TracePath, BoardLayer } from '@pcb/domain';
+import type { Component, TracePath, BoardLayer, BoardProfile, ProfileVertex } from '@pcb/domain';
 
 // ─── Board Constants ────────────────────────────────────────────────────────
 
@@ -109,6 +109,151 @@ function layerSlabInfo(
     default:
       return null;
   }
+}
+
+// ─── Board Profile Shape ────────────────────────────────────────────────────
+
+/**
+ * Build a THREE.Shape from profile vertices.
+ * All math is done in Three.js units (mils × 0.001).
+ * The shape lives in the 2D XY plane of the Shape, which will be
+ * mapped to the Three.js XZ plane by the extrude/rotate step.
+ */
+function profileToShape(
+  outline: BoardProfile,
+  cutouts: BoardProfile[] = [],
+): THREE.Shape {
+  const shape = new THREE.Shape();
+  const verts = outline.vertices;
+  const n = verts.length;
+  if (n < 3) return shape;
+
+  // Convert all vertices to Three.js units up front
+  const pts = verts.map((v) => ({
+    x: milsToUnits(v.x),
+    y: milsToUnits(v.y),
+    r: milsToUnits(v.radius ?? 0),
+  }));
+
+  // For each vertex, compute the arc entry/exit points if it has a fillet radius.
+  // arcStart = point on the incoming edge, arcEnd = point on the outgoing edge.
+  const resolved = pts.map((cur, i) => {
+    const prev = pts[(i - 1 + n) % n];
+    const next = pts[(i + 1) % n];
+
+    if (cur.r <= 0) return { sharp: true as const, x: cur.x, y: cur.y };
+
+    // Vectors from cur toward prev and next (in Three units)
+    const toPrevX = prev.x - cur.x, toPrevY = prev.y - cur.y;
+    const toNextX = next.x - cur.x, toNextY = next.y - cur.y;
+    const lenPrev = Math.hypot(toPrevX, toPrevY);
+    const lenNext = Math.hypot(toNextX, toNextY);
+
+    if (lenPrev < 1e-6 || lenNext < 1e-6) return { sharp: true as const, x: cur.x, y: cur.y };
+
+    const r = Math.min(cur.r, lenPrev / 2, lenNext / 2);
+    if (r < 1e-6) return { sharp: true as const, x: cur.x, y: cur.y };
+
+    return {
+      sharp: false as const,
+      // Arc start: on the incoming edge, distance r from the corner
+      sx: cur.x + (toPrevX / lenPrev) * r,
+      sy: cur.y + (toPrevY / lenPrev) * r,
+      // Corner point (control point for the quadratic curve)
+      cx: cur.x,
+      cy: cur.y,
+      // Arc end: on the outgoing edge, distance r from the corner
+      ex: cur.x + (toNextX / lenNext) * r,
+      ey: cur.y + (toNextY / lenNext) * r,
+    };
+  });
+
+  // Draw the shape path
+  const v0 = resolved[0];
+  if (v0.sharp) {
+    shape.moveTo(v0.x, v0.y);
+  } else {
+    shape.moveTo(v0.sx, v0.sy);
+    shape.quadraticCurveTo(v0.cx, v0.cy, v0.ex, v0.ey);
+  }
+
+  for (let i = 1; i < n; i++) {
+    const vi = resolved[i];
+    if (vi.sharp) {
+      shape.lineTo(vi.x, vi.y);
+    } else {
+      shape.lineTo(vi.sx, vi.sy);
+      shape.quadraticCurveTo(vi.cx, vi.cy, vi.ex, vi.ey);
+    }
+  }
+
+  // Close back to vertex 0
+  if (v0.sharp) {
+    shape.lineTo(v0.x, v0.y);
+  } else {
+    shape.lineTo(v0.sx, v0.sy);
+  }
+
+  // Cutout holes
+  for (const cutout of cutouts) {
+    if (cutout.vertices.length < 3) continue;
+    const hole = new THREE.Path();
+    const cv = cutout.vertices.map((c) => ({ x: milsToUnits(c.x), y: milsToUnits(c.y) }));
+    hole.moveTo(cv[0].x, cv[0].y);
+    for (let j = 1; j < cv.length; j++) hole.lineTo(cv[j].x, cv[j].y);
+    hole.closePath();
+    shape.holes.push(hole);
+  }
+
+  return shape;
+}
+
+/**
+ * Build an extruded mesh from a board profile.
+ *
+ * Coordinate mapping we need:
+ *   Shape X  (domain X)  → Three.js X
+ *   Shape Y  (domain Y)  → Three.js +Z
+ *   Extrude  (thickness)  → Three.js Y
+ *
+ * ExtrudeGeometry extrudes along local +Z, producing geometry in XY+Z space.
+ * We need domain Y in Three +Z and thickness in Three Y.
+ *
+ * Strategy: build the shape in XY, then use geometry transforms:
+ *   1) rotateX(-PI/2): maps (x, y, z) → (x, z, -y)
+ *      Shape point at (sx, sy, 0) → (sx, 0, -sy)    ← domain Y is NEGATED
+ *   So we negate Y in the shape to compensate:
+ *      shape point at (sx, -sy) after rotation → (sx, 0, sy)   ← correct!
+ */
+function buildProfileMesh(
+  outline: BoardProfile,
+  cutouts: BoardProfile[],
+  height: number,
+  material: THREE.Material,
+): THREE.Mesh {
+  // Build shape with NEGATED Y so that after rotateX(-PI/2), domain Y → +Z
+  const flipped: BoardProfile = {
+    ...outline,
+    vertices: outline.vertices.map((v) => ({ ...v, y: -v.y })),
+  };
+  const flippedCutouts = cutouts.map((c) => ({
+    ...c,
+    vertices: c.vertices.map((v) => ({ ...v, y: -v.y })),
+  }));
+
+  const shape = profileToShape(flipped, flippedCutouts);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: height,
+    bevelEnabled: false,
+  });
+
+  // rotateX(-PI/2): (x, y, z) → (x, z, -y)
+  // After rotation the mesh spans Y = 0..height.
+  // Shift down by height/2 so it's centered at Y = 0, matching BoxGeometry behaviour.
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -height / 2, 0);
+
+  return new THREE.Mesh(geo, material);
 }
 
 // ─── Component Mesh ─────────────────────────────────────────────────────────
@@ -240,7 +385,7 @@ function buildTraceMeshes(
     group.add(mesh);
   }
 
-  // ── Vias: copper cylinder spanning fromLayer to toLayer
+  // ── Vias: hollow copper tube spanning fromLayer to toLayer
   for (const via of trace.vias) {
     const fromZ = layerZMap.get(via.fromLayerId) ?? 0;
     const toZ = layerZMap.get(via.toLayerId) ?? 0;
@@ -251,32 +396,47 @@ function buildTraceMeshes(
 
     const outerR = milsToUnits(via.outerDiameter / 2);
     const innerR = milsToUnits(via.drillDiameter / 2);
+    const segments = 16;
 
-    // Outer copper barrel
-    const outerGeo = new THREE.CylinderGeometry(outerR, outerR, height, 12);
-    const outerMesh = new THREE.Mesh(outerGeo, viaMat);
-    group.add(outerMesh);
-
-    // Inner drill hole (dark)
-    const innerGeo = new THREE.CylinderGeometry(innerR, innerR, height + 0.0001, 8);
-    const innerMesh = new THREE.Mesh(innerGeo, holeMat);
-    group.add(innerMesh);
-
-    // Annular ring pads at top and bottom of via
-    const ringGeo = new THREE.CylinderGeometry(outerR, outerR, milsToUnits(COPPER_THICKNESS), 12);
-    const ringTop = new THREE.Mesh(ringGeo, viaMat);
-    ringTop.position.y = height / 2;
-    group.add(ringTop);
-    const ringBot = new THREE.Mesh(ringGeo.clone(), viaMat);
-    ringBot.position.y = -height / 2;
-    group.add(ringBot);
-
-    // Position the via group
     const viaGroup = new THREE.Group();
-    viaGroup.add(outerMesh);
-    viaGroup.add(innerMesh);
-    viaGroup.add(ringTop);
-    viaGroup.add(ringBot);
+
+    // Copper barrel wall: a tube (cylinder with inner hole)
+    // Use a ring shape extruded as a LatheGeometry-like approach,
+    // or simpler: two concentric open-ended cylinders + annular ring caps.
+
+    // Outer wall (open-ended cylinder, visible from outside)
+    const outerWallGeo = new THREE.CylinderGeometry(outerR, outerR, height, segments, 1, true);
+    const outerWall = new THREE.Mesh(outerWallGeo, viaMat);
+    viaGroup.add(outerWall);
+
+    // Inner wall (open-ended cylinder, visible from inside the hole)
+    const innerWallGeo = new THREE.CylinderGeometry(innerR, innerR, height, segments, 1, true);
+    const innerWallMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a, metalness: 0, roughness: 0.8, side: THREE.BackSide,
+    });
+    const innerWall = new THREE.Mesh(innerWallGeo, innerWallMat);
+    viaGroup.add(innerWall);
+
+    // Annular ring caps (top and bottom) — flat rings with hole
+    const ringShape = new THREE.Shape();
+    ringShape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
+    const ringHole = new THREE.Path();
+    ringHole.absarc(0, 0, innerR, 0, Math.PI * 2, true);
+    ringShape.holes.push(ringHole);
+
+    const ringGeo = new THREE.ShapeGeometry(ringShape, segments);
+    // Top ring — rotate to be horizontal, place at top
+    const topRing = new THREE.Mesh(ringGeo, viaMat);
+    topRing.rotation.x = -Math.PI / 2;
+    topRing.position.y = height / 2;
+    viaGroup.add(topRing);
+
+    // Bottom ring
+    const botRing = new THREE.Mesh(ringGeo.clone(), viaMat);
+    botRing.rotation.x = Math.PI / 2;
+    botRing.position.y = -height / 2;
+    viaGroup.add(botRing);
+
     viaGroup.position.set(
       milsToUnits(via.position.x),
       centerY,
@@ -401,11 +561,21 @@ export function Canvas3D() {
     ).length;
     const layerZMap = buildLayerZMap(currentBoard.layers, copperLayerCount);
 
+    // ── Board profiles (outline + cutouts) ──
+    const outline = (currentBoard as any).profiles?.find((p: BoardProfile) => p.kind === 'outline') as BoardProfile | undefined;
+    const cutouts = ((currentBoard as any).profiles?.filter((p: BoardProfile) => p.kind === 'cutout') ?? []) as BoardProfile[];
+    const hasProfile = outline && outline.vertices.length >= 3;
+
     // ── FR4 substrate ──
-    const boardGeo = new THREE.BoxGeometry(w, thickness, h);
     const boardMat = new THREE.MeshStandardMaterial({ color: 0x2a6a2a, roughness: 0.7 });
-    const boardMesh = new THREE.Mesh(boardGeo, boardMat);
-    boardMesh.position.set(w / 2, 0, h / 2);
+    let boardMesh: THREE.Mesh;
+    if (hasProfile) {
+      boardMesh = buildProfileMesh(outline, cutouts, thickness, boardMat);
+    } else {
+      const boardGeo = new THREE.BoxGeometry(w, thickness, h);
+      boardMesh = new THREE.Mesh(boardGeo, boardMat);
+      boardMesh.position.set(w / 2, 0, h / 2);
+    }
     boardMesh.name = 'pcb-substrate';
     scene.add(boardMesh);
 
@@ -414,7 +584,7 @@ export function Canvas3D() {
       const info = layerSlabInfo(layer, layerZMap);
       if (!info) continue;
 
-      const geo = new THREE.BoxGeometry(w, info.height, h);
+      let mesh: THREE.Mesh;
       const mat = new THREE.MeshStandardMaterial({
         color: info.color,
         roughness: info.roughness,
@@ -422,8 +592,16 @@ export function Canvas3D() {
         transparent: info.opacity < 1,
         opacity: info.opacity,
       });
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(w / 2, milsToUnits(info.y), h / 2);
+
+      if (hasProfile) {
+        mesh = buildProfileMesh(outline, cutouts, info.height, mat);
+        mesh.position.y = milsToUnits(info.y);
+      } else {
+        const geo = new THREE.BoxGeometry(w, info.height, h);
+        mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(w / 2, milsToUnits(info.y), h / 2);
+      }
+
       mesh.name = `layer:${layer.id}`;
       mesh.visible = layer.visible;
       scene.add(mesh);

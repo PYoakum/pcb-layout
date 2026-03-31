@@ -13,10 +13,12 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@pcb/domain": "*",
+    "@fastify/cors": "^11.0.1",
     "@pcb/api-contracts": "*",
+    "@pcb/domain": "*",
     "@pcb/project-serialization": "*",
+    "@pcb/rules-engine": "*",
     "fastify": "^5.2.1",
-    "@fastify/cors": "^11.0.1"
+    "puppeteer": "^24.40.0"
   }
 }

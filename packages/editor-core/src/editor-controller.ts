@@ -60,6 +60,7 @@ export class EditorController {
   private activeLayerId: LayerId = '' as LayerId;
   private layers: BoardLayer[] = [];
   private traceWidth = 10;
+  private traceCornerRadius = 0;
 
   // Overlay state
   private ghostComponent: Component | null = null;
@@ -329,6 +330,14 @@ export class EditorController {
     return this.traceWidth;
   }
 
+  setTraceCornerRadius(radius: number): void {
+    this.traceCornerRadius = Math.max(0, radius);
+  }
+
+  getTraceCornerRadius(): number {
+    return this.traceCornerRadius;
+  }
+
   getState(): EditorState {
     return {
       activeTool: this.activeToolType,
@@ -382,6 +391,7 @@ export class EditorController {
       gridConfig: this.gridConfig,
       activeLayerId: this.activeLayerId,
       traceWidth: this.traceWidth,
+      traceCornerRadius: this.traceCornerRadius,
       layers: this.layers,
     };
   }

@@ -33,6 +33,8 @@ export interface ToolContext {
   gridConfig: GridConfig;
   activeLayerId: LayerId;
   traceWidth: number;
+  /** Corner radius (mils) for rounded bends on new traces. 0 = sharp corners. */
+  traceCornerRadius: number;
   /** All board layers -- used by the trace tool to cycle signal layers for via placement */
   layers: BoardLayer[];
 }

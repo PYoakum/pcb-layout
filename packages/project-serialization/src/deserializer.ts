@@ -181,6 +181,7 @@ function deserializeBoard(sb: SerializedBoard, projectId: ProjectId): Deserializ
       id: asId<LayerId>(l.id as string),
       boardId: asId<BoardId>(l.boardId as string),
     })),
+    ...(sb.profiles && { profiles: sb.profiles }),
     createdAt: sb.createdAt,
     updatedAt: sb.updatedAt,
   };

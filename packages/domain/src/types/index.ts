@@ -8,4 +8,5 @@ export * from './module';
 export * from './project';
 export * from './design-rules';
 export * from './hole';
+export * from './silkscreen';
 export * from './render';

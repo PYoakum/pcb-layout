@@ -76,6 +76,28 @@ export async function boardRoutes(app: FastifyInstance, store: Store) {
     return reply.send({ data: board.layers });
   });
 
+  // GET /api/boards/:id/profiles
+  app.get<{ Params: { id: string } }>('/api/boards/:id/profiles', async (req, reply) => {
+    const board = store.boards.getById(req.params.id);
+    if (!board) return reply.status(404).send({ statusCode: 404, error: 'Not Found', message: 'Board not found' });
+    return reply.send({ data: board.profiles ?? [] });
+  });
+
+  // PUT /api/boards/:id/profiles
+  app.put<{
+    Params: { id: string };
+    Body: { profiles: Array<{ vertices: Array<{ x: number; y: number; radius?: number }>; kind: 'outline' | 'cutout' }> };
+  }>('/api/boards/:id/profiles', async (req, reply) => {
+    const board = store.boards.getById(req.params.id);
+    if (!board) return reply.status(404).send({ statusCode: 404, error: 'Not Found', message: 'Board not found' });
+
+    const updated = store.boards.update(req.params.id, {
+      profiles: req.body.profiles,
+      updatedAt: new Date().toISOString(),
+    } as Partial<typeof board>);
+    return reply.send({ data: updated!.profiles });
+  });
+
   // PUT /api/boards/:id/layers
   app.put<{ Params: { id: string }; Body: UpdateLayersRequest }>('/api/boards/:id/layers', async (req, reply) => {
     const board = store.boards.getById(req.params.id);

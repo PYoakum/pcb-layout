@@ -142,6 +142,7 @@ export function serializeBoard(
     name: board.name,
     workspace: board.workspace,
     layers: board.layers,
+    ...(board.profiles && board.profiles.length > 0 && { profiles: board.profiles }),
     components: boardComponents.map(serializeComponent),
     nets: boardNets.map(serializeNet),
     paths: boardPaths.map((p) => serializeTracePath(p, boardDebugLinks)),

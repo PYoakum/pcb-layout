@@ -18,15 +18,20 @@ export {
   traceConnectivityChecker,
   viaDrillSizeChecker,
   viaAnnularRingChecker,
+  viaLayerConnectivityChecker,
   traceToPadAlignmentChecker,
+  traceLayerAssignmentChecker,
+  traceEndpointAlignmentChecker,
 } from './rules/trace-rules';
 
 // Rule checkers - component
 export {
   componentWithinBoundsChecker,
   componentOverlapChecker,
+  componentBodyOverlapChecker,
   componentOnValidLayerChecker,
   padNetAssignmentChecker,
+  icWithinBoardEdgeChecker,
 } from './rules/component-rules';
 
 // Rule checkers - net

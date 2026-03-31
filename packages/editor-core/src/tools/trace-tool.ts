@@ -185,25 +185,52 @@ export class TraceTool implements ToolHandler {
     const pathId = createId<any>('trace');
     const segments: TraceSegment[] = [];
 
-    for (let i = 0; i < this.waypoints.length - 1; i++) {
+    // Snap all waypoints to exact grid to eliminate sub-mil drift
+    const snapped = this.waypoints.map((wp) => {
+      const grid = ctx.gridConfig;
+      if (!grid.snapEnabled) return { ...wp };
+      return {
+        x: Math.round(wp.x / grid.spacingX) * grid.spacingX,
+        y: Math.round(wp.y / grid.spacingY) * grid.spacingY,
+      };
+    });
+
+    for (let i = 0; i < snapped.length - 1; i++) {
       // Skip zero-length segments (via insertion creates two waypoints at same position)
-      const dx = this.waypoints[i + 1].x - this.waypoints[i].x;
-      const dy = this.waypoints[i + 1].y - this.waypoints[i].y;
-      if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) continue;
+      const dx = snapped[i + 1].x - snapped[i].x;
+      const dy = snapped[i + 1].y - snapped[i].y;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
 
       segments.push({
         id: createId('seg'),
         pathId,
         layerId: this.waypointLayers[i],
-        start: { ...this.waypoints[i] },
-        end: { ...this.waypoints[i + 1] },
+        start: { ...snapped[i] },
+        end: { ...snapped[i + 1] },
         width: ctx.traceWidth,
       });
     }
 
-    // Patch via pathIds
+    // Ensure vias are at exact segment junction points
     for (const via of this.vias) {
       via.pathId = pathId;
+      // Snap via position to match the nearest segment endpoint
+      const grid = ctx.gridConfig;
+      if (grid.snapEnabled) {
+        via.position.x = Math.round(via.position.x / grid.spacingX) * grid.spacingX;
+        via.position.y = Math.round(via.position.y / grid.spacingY) * grid.spacingY;
+      }
+    }
+
+    // Ensure consecutive segments share exact endpoints (no floating-point gaps)
+    for (let i = 1; i < segments.length; i++) {
+      const prev = segments[i - 1];
+      const curr = segments[i];
+      // If the segments are on different layers (via crossing), they share the via position
+      // If same layer, the end of prev must equal start of curr
+      if (prev.layerId === curr.layerId) {
+        curr.start = { ...prev.end };
+      }
     }
 
     const tracePath: TracePath = {
@@ -212,7 +239,7 @@ export class TraceTool implements ToolHandler {
       segments,
       vias: this.vias,
       debugLinks: [],
-      cornerRadius: 0,
+      cornerRadius: ctx.traceCornerRadius ?? 0,
     };
 
     ops.addTrace(tracePath);

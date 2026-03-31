@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useStore } from '../../store';
 import type { EditorTool } from '../../store/editor-slice';
-import { exportProject } from '../../api/client';
+import { exportProject, saveBoard, screenshotBoard, type ExportFormat } from '../../api/client';
 import { deserializeProject, validateProjectFile } from '@pcb/project-serialization';
 import type { ProjectFile } from '@pcb/project-serialization';
 import { LayerType } from '@pcb/domain';
@@ -28,6 +28,9 @@ export function Toolbar() {
   const openNewProjectDialog = useStore((s) => s.openNewProjectDialog);
   const openWorkspaceSettings = useStore((s) => s.openWorkspaceSettings);
   const currentProjectId = useStore((s) => s.currentProject?.id);
+  const currentBoardId = useStore((s) => s.currentBoard?.id);
+  const components = useStore((s) => s.components);
+  const traces = useStore((s) => s.traces);
   const setCurrentProject = useStore((s) => s.setCurrentProject);
   const setCurrentBoard = useStore((s) => s.setCurrentBoard);
   const setComponents = useStore((s) => s.setComponents);
@@ -78,12 +81,52 @@ export function Toolbar() {
     e.target.value = '';
   };
 
-  const handleExport = async () => {
+  const handleSave = async () => {
+    if (!currentBoardId) return;
+    try {
+      await saveBoard(currentBoardId as string, components, traces);
+      addNotification({ type: 'success', message: 'Board saved' });
+    } catch (err) {
+      addNotification({ type: 'error', message: `Save failed: ${err instanceof Error ? err.message : 'Unknown error'}` });
+    }
+  };
+
+  const handleScreenshot = async () => {
+    // Try client-side canvas capture first (instant, no server needed)
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `board_${mode}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        addNotification({ type: 'success', message: 'Screenshot saved' });
+        return;
+      } catch {
+        // Canvas tainted or unavailable, fall through to server-side
+      }
+    }
+
+    // Fallback: server-side Puppeteer screenshot
+    if (!currentBoardId) return;
+    try {
+      await screenshotBoard(currentBoardId as string, mode as '2d' | '3d');
+      addNotification({ type: 'success', message: 'Screenshot saved (server-rendered)' });
+    } catch (err) {
+      addNotification({ type: 'error', message: `Screenshot failed: ${err instanceof Error ? err.message : 'Unknown error'}` });
+    }
+  };
+
+  const handleExport = async (format: ExportFormat = 'pcb') => {
     if (!currentProjectId) return;
     try {
-      await exportProject(currentProjectId);
+      await exportProject(currentProjectId, format);
+      addNotification({ type: 'success', message: `Exported as .${format}` });
     } catch (err) {
-      console.error('Export failed:', err);
+      addNotification({ type: 'error', message: `Export failed: ${err instanceof Error ? err.message : 'Unknown error'}` });
     }
   };
 
@@ -104,8 +147,12 @@ export function Toolbar() {
           style={{ display: 'none' }}
           onChange={handleFileSelected}
         />
-        <button className="toolbar__btn">Save</button>
-        <button className="toolbar__btn" onClick={handleExport}>Export .pcb</button>
+        <button className="toolbar__btn" onClick={handleSave}>Save</button>
+        <button className="toolbar__btn" onClick={() => handleExport('pcb')}>Export .pcb</button>
+        <button className="toolbar__btn" onClick={() => handleExport('kicad_pcb')}>KiCad</button>
+        <button className="toolbar__btn" onClick={() => handleExport('brd')}>Eagle</button>
+        <button className="toolbar__btn" onClick={() => handleExport('PcbDoc')}>Altium</button>
+        <button className="toolbar__btn" onClick={handleScreenshot}>Screenshot</button>
       </div>
 
       <div className="toolbar__separator" />

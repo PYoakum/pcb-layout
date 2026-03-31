@@ -38,7 +38,7 @@ export class EntityStore<T extends { id: string }> {
   }
 }
 
-import type { Project, Board, Module, Component, TracePath, Net, DebugLink } from '@pcb/domain';
+import type { Project, Board, Module, Component, TracePath, Net, DebugLink, DesignRule } from '@pcb/domain';
 
 export interface Store {
   projects: EntityStore<Project>;
@@ -48,6 +48,7 @@ export interface Store {
   paths: EntityStore<TracePath & { boardId: string }>;
   nets: EntityStore<Net & { boardId: string }>;
   debugLinks: EntityStore<DebugLink>;
+  designRules: EntityStore<DesignRule & { boardId: string }>;
 }
 
 export function createStore(): Store {
@@ -59,5 +60,6 @@ export function createStore(): Store {
     paths: new EntityStore(),
     nets: new EntityStore(),
     debugLinks: new EntityStore(),
+    designRules: new EntityStore(),
   };
 }

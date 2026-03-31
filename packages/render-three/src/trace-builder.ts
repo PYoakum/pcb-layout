@@ -37,9 +37,15 @@ export class TraceBuilder {
       group.add(mesh);
     }
 
+    // Fallback Z values: use the top and bottom of the layer stack
+    // so vias don't float above the board when layer IDs don't match
+    const zValues = [...layerZMap.values()];
+    const fallbackTop = zValues.length > 0 ? Math.max(...zValues) : 0;
+    const fallbackBot = zValues.length > 0 ? Math.min(...zValues) : 0;
+
     for (const via of path.vias) {
-      const fromZ = layerZMap.get(via.fromLayerId) ?? 0;
-      const toZ = layerZMap.get(via.toLayerId) ?? 0;
+      const fromZ = layerZMap.get(via.fromLayerId) ?? fallbackTop;
+      const toZ = layerZMap.get(via.toLayerId) ?? fallbackBot;
       const viaGroup = this.buildVia(via, fromZ, toZ);
       group.add(viaGroup);
     }

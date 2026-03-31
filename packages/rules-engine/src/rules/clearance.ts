@@ -4,6 +4,7 @@ import type { RuleChecker, ValidationContext } from '../types';
 import {
   transformBoundingBox,
   boundingBoxDistance,
+  pointInBoundingBox,
   pointToSegmentDistance,
   segmentDistance,
   padWorldPosition,
@@ -122,8 +123,23 @@ export const traceToComponentClearanceChecker: RuleChecker = {
 
           const box = transformBoundingBox(comp.footprint.courtyard, comp.transform);
 
-          const distStart = pointToSegmentDistanceToBox(seg.start, seg.end, box);
-          const effectiveDist = distStart - seg.width / 2;
+          // Check if segment endpoints are inside the courtyard (trace passes through)
+          const startInside = pointInBoundingBox(seg.start, box);
+          const endInside = pointInBoundingBox(seg.end, box);
+
+          if (startInside || endInside) {
+            violations.push({
+              ruleId: rule.id,
+              entityIds: [seg.id, comp.id],
+              message: `Trace-to-component clearance violation: segment ${seg.id} passes through ${comp.designator} courtyard`,
+              severity: 'error',
+              location: { x: seg.start.x, y: seg.start.y },
+            });
+            continue;
+          }
+
+          const distToBox = pointToSegmentDistanceToBox(seg.start, seg.end, box);
+          const effectiveDist = distToBox - seg.width / 2;
 
           if (effectiveDist < minClearance) {
             violations.push({

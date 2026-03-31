@@ -35,6 +35,7 @@ export async function pathRoutes(app: FastifyInstance, store: Store) {
       segments,
       vias,
       debugLinks: [],
+      cornerRadius: 0,
       boardId: req.body.boardId,
     });
     return reply.status(201).send({ data: path });

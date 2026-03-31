@@ -23,7 +23,7 @@ import type {
 import type { ValidationRequest, ValidationResponse } from '@pcb/api-contracts';
 import type { ApiResponse, ErrorResponse } from '@pcb/api-contracts';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3100';
+const BASE_URL = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:3001`;
 
 class ApiError extends Error {
   constructor(
@@ -259,10 +259,85 @@ export async function getPathDebug(
   );
 }
 
+// ── Save ──
+
+/**
+ * Save the current board state to the API server.
+ * Syncs components and traces so the server has the latest data.
+ */
+export async function saveBoard(
+  boardId: string,
+  components: Component[],
+  traces: TracePath[],
+): Promise<void> {
+  // Sync components
+  const existingComps = await request<{ data: Component[] }>('GET', `/api/components?boardId=${boardId}`);
+  const existingIds = new Set(existingComps.data.map((c) => c.id));
+
+  for (const comp of components) {
+    if (existingIds.has(comp.id)) {
+      await request('PUT', `/api/components/${comp.id}`, comp);
+    } else {
+      await request('POST', '/api/components', { ...comp, boardId });
+    }
+  }
+
+  // Sync traces
+  const existingPaths = await request<{ data: TracePath[] }>('GET', `/api/paths?boardId=${boardId}`);
+  const existingPathIds = new Set(existingPaths.data.map((p) => p.id));
+
+  for (const trace of traces) {
+    if (existingPathIds.has(trace.id)) {
+      await request('PUT', `/api/paths/${trace.id}`, {
+        segments: trace.segments.map(({ layerId, start, end, width }) => ({ layerId, start, end, width })),
+        vias: trace.vias.map(({ position, fromLayerId, toLayerId, outerDiameter, drillDiameter, netId }) => ({ position, fromLayerId, toLayerId, outerDiameter, drillDiameter, netId })),
+      });
+    } else {
+      await request('POST', '/api/paths', {
+        netId: trace.netId,
+        boardId,
+        segments: trace.segments.map(({ layerId, start, end, width }) => ({ layerId, start, end, width })),
+        vias: trace.vias.map(({ position, fromLayerId, toLayerId, outerDiameter, drillDiameter, netId }) => ({ position, fromLayerId, toLayerId, outerDiameter, drillDiameter, netId })),
+      });
+    }
+  }
+}
+
+// ── Screenshot ──
+
+export async function screenshotBoard(boardId: string, mode: '2d' | '3d' = '2d'): Promise<void> {
+  const url = `${BASE_URL}/api/boards/${boardId}/screenshot?mode=${mode}&width=1920&height=1080`;
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    let errorBody: ErrorResponse;
+    try {
+      errorBody = await res.json();
+    } catch {
+      throw new ApiError(res.status, 'unknown', res.statusText);
+    }
+    throw new ApiError(errorBody.statusCode, errorBody.error, errorBody.message);
+  }
+
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `board_${mode}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
 // ── Export ──
 
-export async function exportProject(projectId: string): Promise<void> {
-  const url = `${BASE_URL}/api/projects/${projectId}/export`;
+export type ExportFormat = 'pcb' | 'kicad_pcb' | 'brd' | 'PcbDoc';
+
+export async function exportProject(
+  projectId: string,
+  format: ExportFormat = 'pcb',
+): Promise<void> {
+  const url = `${BASE_URL}/api/projects/${projectId}/export?format=${format}`;
   const res = await fetch(url);
 
   if (!res.ok) {
@@ -278,7 +353,7 @@ export async function exportProject(projectId: string): Promise<void> {
   const blob = await res.blob();
   const disposition = res.headers.get('Content-Disposition') ?? '';
   const filenameMatch = disposition.match(/filename="(.+?)"/);
-  const filename = filenameMatch?.[1] ?? 'project.pcb';
+  const filename = filenameMatch?.[1] ?? `project.${format === 'pcb' ? 'pcb' : format}`;
 
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

@@ -2,7 +2,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import { useStore } from '../store';
 import type { Board, Component, TracePath, Project } from '@pcb/domain';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:3001`;
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
 type ServerMessage =
@@ -23,8 +23,17 @@ type ServerMessage =
 async function loadSessionBoard(sessionCode: string) {
   const store = useStore.getState();
 
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionCode}/snapshot`);
-  if (!res.ok) return;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/sessions/${sessionCode}/snapshot`);
+  } catch (err) {
+    store.setSessionError('Failed to connect to API server');
+    return;
+  }
+  if (!res.ok) {
+    store.setSessionError(`Failed to load board: ${res.status}`);
+    return;
+  }
   const { data } = await res.json();
 
   const board: Board = data.board;

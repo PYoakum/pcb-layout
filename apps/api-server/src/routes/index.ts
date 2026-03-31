@@ -8,6 +8,8 @@ import { pathRoutes } from './paths';
 import { netRoutes } from './nets';
 import { validationRoutes } from './validation';
 import { exportRoutes } from './export';
+import { designRuleRoutes } from './design-rules';
+import { screenshotRoutes } from './screenshot';
 
 export async function registerRoutes(app: FastifyInstance, store: Store) {
   await projectRoutes(app, store);
@@ -18,4 +20,6 @@ export async function registerRoutes(app: FastifyInstance, store: Store) {
   await netRoutes(app, store);
   await validationRoutes(app, store);
   await exportRoutes(app, store);
+  await designRuleRoutes(app, store);
+  await screenshotRoutes(app, store);
 }

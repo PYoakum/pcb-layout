@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { LayerId, Component, TracePath, MountingHole, Point2D } from '@pcb/domain';
+import type { LayerId, Component, TracePath, MountingHole, SilkscreenLabel, Point2D } from '@pcb/domain';
 import type { LibraryComponent } from '../data/default-components';
 
 export type EditorTool = 'select' | 'place' | 'trace' | 'pan' | 'measure';
@@ -30,6 +30,7 @@ export interface EditorSlice {
   components: Component[];
   traces: TracePath[];
   mountingHoles: MountingHole[];
+  silkscreenLabels: SilkscreenLabel[];
 
   // Undo/redo availability (mirrors controller state for UI)
   canUndo: boolean;
@@ -55,6 +56,8 @@ export interface EditorSlice {
   startPlacement: (template: LibraryComponent) => void;
   cancelPlacement: () => void;
   setTraceWidth: (width: number) => void;
+  traceCornerRadius: number;
+  setTraceCornerRadius: (radius: number) => void;
   setSelectedIds: (ids: string[]) => void;
   addToSelection: (id: string) => void;
   removeFromSelection: (id: string) => void;
@@ -86,6 +89,12 @@ export interface EditorSlice {
   addMountingHole: (hole: MountingHole) => void;
   removeMountingHole: (id: string) => void;
 
+  // Silkscreen label mutations
+  setSilkscreenLabels: (labels: SilkscreenLabel[]) => void;
+  addSilkscreenLabel: (label: SilkscreenLabel) => void;
+  removeSilkscreenLabel: (id: string) => void;
+  updateSilkscreenLabel: (id: string, updates: Partial<SilkscreenLabel>) => void;
+
   // Undo/redo state
   setCanUndo: (value: boolean) => void;
   setCanRedo: (value: boolean) => void;
@@ -110,6 +119,7 @@ export const createEditorSlice: StateCreator<EditorSlice> = (set) => ({
   components: [],
   traces: [],
   mountingHoles: [],
+  silkscreenLabels: [],
 
   canUndo: false,
   canRedo: false,
@@ -117,6 +127,7 @@ export const createEditorSlice: StateCreator<EditorSlice> = (set) => ({
   placementTemplate: null,
 
   traceWidth: 10,
+  traceCornerRadius: 0,
 
   cursorWorldPosition: { x: 0, y: 0 },
 
@@ -132,6 +143,7 @@ export const createEditorSlice: StateCreator<EditorSlice> = (set) => ({
   cancelPlacement: () => set({ placementTemplate: null, activeTool: 'select' }),
 
   setTraceWidth: (width) => set({ traceWidth: Math.max(1, width) }),
+  setTraceCornerRadius: (radius) => set({ traceCornerRadius: Math.max(0, radius) }),
 
   setSelectedIds: (ids) => set({ selectedIds: ids }),
 
@@ -232,6 +244,22 @@ export const createEditorSlice: StateCreator<EditorSlice> = (set) => ({
 
   removeMountingHole: (id) =>
     set((state) => ({ mountingHoles: state.mountingHoles.filter((h) => h.id !== id) })),
+
+  // Silkscreen labels
+  setSilkscreenLabels: (labels) => set({ silkscreenLabels: labels }),
+
+  addSilkscreenLabel: (label) =>
+    set((state) => ({ silkscreenLabels: [...state.silkscreenLabels, label] })),
+
+  removeSilkscreenLabel: (id) =>
+    set((state) => ({ silkscreenLabels: state.silkscreenLabels.filter((l) => l.id !== id) })),
+
+  updateSilkscreenLabel: (id, updates) =>
+    set((state) => ({
+      silkscreenLabels: state.silkscreenLabels.map((l) =>
+        l.id === id ? { ...l, ...updates } : l,
+      ),
+    })),
 
   // Undo/redo
   setCanUndo: (value) => set({ canUndo: value }),

@@ -260,8 +260,12 @@ export class PCBCanvas {
 
     // Components
     for (const comp of this.components) {
-      const layerContainer = this.layerRenderer.getContainer(comp.layerId);
-      if (!layerContainer) continue;
+      let layerContainer = this.layerRenderer.getContainer(comp.layerId);
+      if (!layerContainer && this.board) {
+        const fallback = this.board.layers.find((l) => l.type === 'signal');
+        if (fallback) layerContainer = this.layerRenderer.getContainer(fallback.id);
+      }
+      if (!layerContainer) layerContainer = this.pcbLayersRoot;
 
       const layerDef = this.board?.layers.find((l) => l.id === comp.layerId);
       const layerColor = layerDef ? resolveLayerColor(layerDef) : 0xcccccc;
@@ -328,10 +332,26 @@ export class PCBCanvas {
       const firstSeg = path.segments[0];
       if (!firstSeg) continue;
 
-      const layerContainer = this.layerRenderer.getContainer(firstSeg.layerId);
-      if (!layerContainer) continue;
+      // Try to place on the correct layer container; fall back to first
+      // signal layer or pcbLayersRoot so traces are always visible
+      let layerContainer = this.layerRenderer.getContainer(firstSeg.layerId);
+      let layerDef = this.board?.layers.find((l) => l.id === firstSeg.layerId);
 
-      const layerDef = this.board?.layers.find((l) => l.id === firstSeg.layerId);
+      if (!layerContainer && this.board) {
+        // Segment layerId doesn't match any board layer (e.g. after ID sync).
+        // Fall back to the first signal layer so the trace still renders.
+        const fallbackLayer = this.board.layers.find((l) => l.type === 'signal');
+        if (fallbackLayer) {
+          layerContainer = this.layerRenderer.getContainer(fallbackLayer.id);
+          layerDef = fallbackLayer;
+        }
+      }
+
+      if (!layerContainer) {
+        // Last resort: render directly into the pcb layers root
+        layerContainer = this.pcbLayersRoot;
+      }
+
       const layerColor = layerDef ? resolveLayerColor(layerDef) : 0xcccccc;
 
       const opts: TraceRenderOptions = {

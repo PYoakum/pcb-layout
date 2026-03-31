@@ -2,6 +2,7 @@ import type {
   ProjectSettings,
   WorkspaceConfig,
   BoardLayer,
+  BoardProfile,
   Transform2D,
   BoundingBox,
   Point2D,
@@ -42,6 +43,7 @@ export interface SerializedBoard {
   name: string;
   workspace: WorkspaceConfig;
   layers: BoardLayer[];
+  profiles?: BoardProfile[];
   components: SerializedComponent[];
   nets: SerializedNet[];
   paths: SerializedTracePath[];
