@@ -9,24 +9,18 @@ const browser = await puppeteer.launch({
 const page = await browser.newPage();
 await page.setViewport({ width: 2560, height: 1440, deviceScaleFactor: 2 });
 
-console.log('Loading web client...');
 await page.goto('http://localhost:5173', { waitUntil: 'domcontentloaded', timeout: 10000 });
 await page.waitForSelector('canvas', { timeout: 8000 });
 await new Promise(r => setTimeout(r, 1000));
 
-// Load the DDR5 board file and inject into the store
-console.log('Injecting DDR5 board data...');
 const pcbData = readFileSync('/Users/devmachine/dev-projects/pcb-layout/examples/DDR5-96GB-RDIMM.json', 'utf-8');
 
 await page.evaluate((pcbJson) => {
   const file = JSON.parse(pcbJson);
   const sp = file.project;
   const board = sp.boards[0];
-  
   const store = window.__ZUSTAND_STORE__;
-  if (!store) { console.error('Store not found!'); return; }
-  
-  // Set project
+  if (!store) return;
   store.setState({
     currentProject: {
       id: sp.id, name: sp.name, description: sp.description,
@@ -41,20 +35,26 @@ await page.evaluate((pcbJson) => {
     },
     layers: board.layers,
     workspaceConfig: board.workspace,
-    components: board.components.map(c => ({
-      ...c,
-      layerId: c.layerId,
-    })),
+    components: board.components,
     traces: board.paths || [],
-    viewport: { x: 50, y: 50, zoom: 0.45 },
+    // Zoom into U1 area to show pad connections
+    viewport: { x: -20, y: 10, zoom: 1.2 },
     gridVisible: true,
   });
 }, pcbData);
 
-console.log('Waiting for render...');
 await new Promise(r => setTimeout(r, 3000));
 
-await page.screenshot({ path: '/tmp/board_ddr5.png', fullPage: false });
-console.log('Screenshot saved to /tmp/board_ddr5.png');
+await page.screenshot({ path: '/tmp/board_zoomed.png', fullPage: false });
+console.log('Zoomed screenshot saved');
+
+// Also take the full board view for the README
+await page.evaluate(() => {
+  const store = window.__ZUSTAND_STORE__;
+  store.setState({ viewport: { x: 50, y: 50, zoom: 0.45 } });
+});
+await new Promise(r => setTimeout(r, 2000));
+await page.screenshot({ path: '/tmp/board_full.png', fullPage: false });
+console.log('Full screenshot saved');
 
 await browser.close();
